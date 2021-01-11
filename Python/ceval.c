@@ -3400,8 +3400,12 @@ main_loop:
         /* ADDED THIS */
         case TARGET(SETUP_SANDBOX): {
             if (oparg) {
-              printf("%s\n", "call prolog");
+              printf("%s", "call prolog: arg mem=");
+              PyObject *mem = *(stack_pointer - 2);
+              PyObject_Print(mem, stdout, 0); // convenient but just to print
+              putchar('\n');
               fflush(stdout);
+              stack_pointer = stack_pointer-2; // TODO ?? so that they are "consumed"
             } else {
               printf("%s\n", "call epilog");
               fflush(stdout);

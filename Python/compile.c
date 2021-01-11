@@ -5007,17 +5007,14 @@ compiler_with(struct compiler *c, stmt_ty s, int pos)
 static int
 compiler_sandbox(struct compiler *c, stmt_ty s)
 {
-    //basicblock *block, *final, *exit;
     basicblock *block;
-
     assert(s->kind == Sandbox_kind);
-
     block = compiler_new_block(c);
-    //final = compiler_new_block(c);
-    //exit = compiler_new_block(c);
-    //if (!block || !final || !exit)
     if(!block)
         return 0;
+  /* Load sandbox arguments on the stack */
+    ADDOP_LOAD_CONST(c, s->v.Sandbox.mem);
+    ADDOP_LOAD_CONST(c, s->v.Sandbox.sys);
 
     ADDOP_I(c, SETUP_SANDBOX, 0);
     compiler_use_next_block(c, block);

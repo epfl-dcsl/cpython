@@ -178,6 +178,8 @@ struct _stmt {
         } AsyncWith;
 
         struct {
+            string mem;
+            string sys;
             asdl_seq *body;
         } Sandbox;
 
@@ -527,9 +529,10 @@ stmt_ty _Py_With(asdl_seq * items, asdl_seq * body, string type_comment, int
 stmt_ty _Py_AsyncWith(asdl_seq * items, asdl_seq * body, string type_comment,
                       int lineno, int col_offset, int end_lineno, int
                       end_col_offset, PyArena *arena);
-#define Sandbox(a0, a1, a2, a3, a4, a5) _Py_Sandbox(a0, a1, a2, a3, a4, a5)
-stmt_ty _Py_Sandbox(asdl_seq * body, int lineno, int col_offset, int
-                    end_lineno, int end_col_offset, PyArena *arena);
+#define Sandbox(a0, a1, a2, a3, a4, a5, a6, a7) _Py_Sandbox(a0, a1, a2, a3, a4, a5, a6, a7)
+stmt_ty _Py_Sandbox(string mem, string sys, asdl_seq * body, int lineno, int
+                    col_offset, int end_lineno, int end_col_offset, PyArena
+                    *arena);
 #define Raise(a0, a1, a2, a3, a4, a5, a6) _Py_Raise(a0, a1, a2, a3, a4, a5, a6)
 stmt_ty _Py_Raise(expr_ty exc, expr_ty cause, int lineno, int col_offset, int
                   end_lineno, int end_col_offset, PyArena *arena);

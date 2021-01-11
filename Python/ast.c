@@ -4480,23 +4480,48 @@ ast_for_stmt(struct compiling *c, const node *n)
 }
 
 /* ADDED THIS */
-/* sandbox_stmt: 'sandbox' ':' suite */
+/* Done this simple function to do quickly the job, but unlike parsestr it does not perform any check whatsoever */
+/* Just put it there, although it is for sure not the best place */
+static string
+quick_decode_string(const char *s, struct compiling *c)
+{
+    PyObject *res = PyUnicode_DecodeUTF8(s+1, strlen(s)-2, NULL); // in order to get rid of the quotes
+    if (res == NULL)
+        return NULL;
+    if (PyArena_AddPyObject(c->c_arena, res) < 0) {
+        Py_DECREF(res);
+        return NULL;
+    }
+    return res;
+}
+
 static stmt_ty
 ast_for_sandbox(struct compiling *c, const node *n)
 {
-    /* notes: 
-    * - NCH returns the number of children
-    * - REQ verifies that the node indeed has the expected type
-    */
-    int end_lineno, end_col_offset;
+   int end_lineno, end_col_offset;
+    asdl_seq *body;
+
+    /*PyObject *mem, *sys;
+    int bytesmode, rawmode;
+    const char *fstr;
+    Py_ssize_t fstrlen = -1;*/ // TODO handle cases where the string might be bytes & Cie ?
+
     REQ(n, sandbox_stmt);
 
-    asdl_seq * body = ast_for_suite(c, CHILD(n, NCH(n) - 1)); 
+    /* Handle mem and sys strings */
+    const node *n_mem = CHILD(n,2);
+    const node *n_sys = CHILD(n,4);
+    REQ(n_mem, STRING);
+    REQ(n_sys, STRING);
+    string mem = quick_decode_string(STR(n_mem), c);
+    string sys = quick_decode_string(STR(n_sys), c);
+
+    body = ast_for_suite(c, CHILD(n, NCH(n) - 1)); 
     if (!body)
         return NULL;
     get_last_end_pos(body, &end_lineno, &end_col_offset);
 
-    return Sandbox(body, LINENO(n), n->n_col_offset, 
+    return Sandbox(mem, sys, body, LINENO(n), n->n_col_offset, 
               end_lineno, end_col_offset, c->c_arena);
 }
 

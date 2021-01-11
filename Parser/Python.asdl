@@ -35,7 +35,7 @@ module Python
           | If(expr test, stmt* body, stmt* orelse)
           | With(withitem* items, stmt* body, string? type_comment)
           | AsyncWith(withitem* items, stmt* body, string? type_comment)
-          | Sandbox(stmt* body)
+          | Sandbox(string mem, string sys, stmt* body) -- ADDED THIS
 
           | Raise(expr? exc, expr? cause)
           | Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)
