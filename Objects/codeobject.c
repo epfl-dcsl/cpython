@@ -135,7 +135,7 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
         varnames == NULL || !PyTuple_Check(varnames) ||
         freevars == NULL || !PyTuple_Check(freevars) ||
         cellvars == NULL || !PyTuple_Check(cellvars) ||
-        sandboxes == NULL || !PySet_Check(sandboxes) ||
+        sandboxes == NULL || !PyDict_Check(sandboxes) ||
         name == NULL || !PyUnicode_Check(name) ||
         filename == NULL || !PyUnicode_Check(filename) ||
         lnotab == NULL || !PyBytes_Check(lnotab)) {
@@ -361,7 +361,7 @@ PyCode_NewEmpty(const char *filename, const char *funcname, int firstlineno)
                 nulltuple,                      /* varnames */
                 nulltuple,                      /* freevars */
                 nulltuple,                      /* cellvars */
-                PySet_New(NULL),                /* sandboxes */
+                PyDict_New(),                   /* sandboxes */
                 filename_ob,                    /* filename */
                 funcname_ob,                    /* name */
                 firstlineno,                    /* firstlineno */
@@ -679,7 +679,7 @@ code_replace_impl(PyCodeObject *self, int co_argcount,
     return (PyObject *)PyCode_NewWithPosOnlyArgs(
         co_argcount, co_posonlyargcount, co_kwonlyargcount, co_nlocals,
         co_stacksize, co_flags, (PyObject*)co_code, co_consts, co_names,
-        co_varnames, co_freevars, co_cellvars, PySet_New(NULL), co_filename, co_name,
+        co_varnames, co_freevars, co_cellvars, PyDict_New(), co_filename, co_name,
         co_firstlineno, (PyObject*)co_lnotab);
 }
 

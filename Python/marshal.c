@@ -1359,7 +1359,7 @@ r_object(RFILE *p)
             cellvars = r_object(p);
             if (cellvars == NULL)
                 goto code_error;
-            sandboxes = PySet_New(NULL);
+            sandboxes = PyDict_New();
             if (sandboxes == NULL)
                 goto code_error;
             filename = r_object(p);

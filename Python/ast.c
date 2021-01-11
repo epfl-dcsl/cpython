@@ -563,6 +563,7 @@ struct compiling {
     PyObject *c_filename; /* filename */
     PyObject *c_normalize; /* Normalization function from unicodedata. */
     int c_feature_version; /* Latest minor version of Python for allowed features */
+    long c_sandbox_id_counter; /* ADDED THIS: Generator of sandboxes identifiers */
 };
 
 static asdl_seq *seq_for_testlist(struct compiling *, const node *);
@@ -782,6 +783,7 @@ PyAST_FromNodeObject(const node *n, PyCompilerFlags *flags,
     c.c_normalize = NULL;
     c.c_feature_version = flags && (flags->cf_flags & PyCF_ONLY_AST) ?
         flags->cf_feature_version : PY_MINOR_VERSION;
+    c.c_sandbox_id_counter = 0L;
 
     if (TYPE(n) == encoding_decl)
         n = CHILD(n, 0);
@@ -4495,17 +4497,29 @@ quick_decode_string(const char *s, struct compiling *c)
     return res;
 }
 
+static PyObject*
+sandbox_generate_id(struct compiling *c) {
+    PyObject *id;
+
+    id = PyLong_FromLong(c->c_sandbox_id_counter);
+    if (id == NULL) {
+        return NULL;
+    }
+
+    if (PyArena_AddPyObject(c->c_arena, id) < 0) {
+        Py_DECREF(id);
+        return NULL;
+    }
+    c->c_sandbox_id_counter += 1;
+    return id;
+}
+
 static stmt_ty
 ast_for_sandbox(struct compiling *c, const node *n)
 {
    int end_lineno, end_col_offset;
     asdl_seq *body;
-
-    /*PyObject *mem, *sys;
-    int bytesmode, rawmode;
-    const char *fstr;
-    Py_ssize_t fstrlen = -1;*/ // TODO handle cases where the string might be bytes & Cie ?
-
+    constant id;
     REQ(n, sandbox_stmt);
 
     /* Handle mem and sys strings */
@@ -4515,13 +4529,18 @@ ast_for_sandbox(struct compiling *c, const node *n)
     REQ(n_sys, STRING);
     string mem = quick_decode_string(STR(n_mem), c);
     string sys = quick_decode_string(STR(n_sys), c);
+   /* Generate id */
+    id = sandbox_generate_id(c);
+    if (id == NULL) {
+        return NULL;
+    }
 
     body = ast_for_suite(c, CHILD(n, NCH(n) - 1)); 
     if (!body)
         return NULL;
     get_last_end_pos(body, &end_lineno, &end_col_offset);
 
-    return Sandbox(mem, sys, body, LINENO(n), n->n_col_offset, 
+    return Sandbox(id, mem, sys, body, LINENO(n), n->n_col_offset, 
               end_lineno, end_col_offset, c->c_arena);
 }
 
