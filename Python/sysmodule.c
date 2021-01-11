@@ -3023,6 +3023,14 @@ _PySys_Create(PyThreadState *tstate, PyObject **sysmod_p)
     }
     interp->modules = modules;
 
+    // TODO put that somewhere else ?
+    PyObject *dependencies = PyDict_New();
+    if (dependencies == NULL) {
+        goto error;
+    }
+    interp->dependencies = dependencies;
+    // -------------------------------
+
     PyObject *sysmod = _PyModule_CreateInitialized(&sysmodule, PYTHON_API_VERSION);
     if (sysmod == NULL) {
         return _PyStatus_ERR("failed to create a module object");

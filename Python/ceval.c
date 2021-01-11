@@ -944,6 +944,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
     const _Py_CODEUNIT *first_instr;
     PyObject *names;
     PyObject *consts;
+    PyObject *sandboxes; // (ADDED THIS)
     _PyOpcache *co_opcache;
 
 #ifdef LLTRACE
@@ -1298,6 +1299,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
     co = f->f_code;
     names = co->co_names;
     consts = co->co_consts;
+    sandboxes = co->co_sandboxes;
     fastlocals = f->f_localsplus;
     freevars = f->f_localsplus + co->co_nlocals;
     assert(PyBytes_Check(co->co_code));
@@ -5198,6 +5200,22 @@ import_name(PyThreadState *tstate, PyFrameObject *f,
             _PyErr_SetString(tstate, PyExc_ImportError, "__import__ not found");
         }
         return NULL;
+    }
+    
+    // TODO remove this
+    PyObject *pkgname = _PyDict_GetItemIdWithError(f->f_globals, &PyId___name__);
+    PyObject *dep;
+
+    //printf("in import_name (");
+    if (pkgname != NULL && PyUnicode_Check(pkgname)) {
+        //PyObject_Print(pkgname, stdout, 0);
+        dep = PyDict_GetItemWithError(tstate->interp->dependencies, pkgname);
+        if (dep == NULL) {
+            dep = PySet_New(NULL);
+        }
+        PySet_Add(dep, name); // should check validity
+
+        PyObject_SetItem(tstate->interp->dependencies, pkgname, dep);
     }
 
     /* Fast path for not overloaded __import__. */

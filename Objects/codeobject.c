@@ -118,7 +118,7 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
                           int nlocals, int stacksize, int flags,
                           PyObject *code, PyObject *consts, PyObject *names,
                           PyObject *varnames, PyObject *freevars, PyObject *cellvars,
-                          PyObject *filename, PyObject *name, int firstlineno,
+                          PyObject *sandboxes, PyObject *filename, PyObject *name, int firstlineno,
                           PyObject *lnotab)
 {
     PyCodeObject *co;
@@ -135,6 +135,7 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
         varnames == NULL || !PyTuple_Check(varnames) ||
         freevars == NULL || !PyTuple_Check(freevars) ||
         cellvars == NULL || !PyTuple_Check(cellvars) ||
+        sandboxes == NULL || !PySet_Check(sandboxes) ||
         name == NULL || !PyUnicode_Check(name) ||
         filename == NULL || !PyUnicode_Check(filename) ||
         lnotab == NULL || !PyBytes_Check(lnotab)) {
@@ -245,6 +246,8 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
     Py_INCREF(cellvars);
     co->co_cellvars = cellvars;
     co->co_cell2arg = cell2arg;
+    Py_INCREF(sandboxes);
+    co->co_sandboxes = sandboxes;
     Py_INCREF(filename);
     co->co_filename = filename;
     Py_INCREF(name);
@@ -268,12 +271,12 @@ PyCode_New(int argcount, int kwonlyargcount,
            int nlocals, int stacksize, int flags,
            PyObject *code, PyObject *consts, PyObject *names,
            PyObject *varnames, PyObject *freevars, PyObject *cellvars,
-           PyObject *filename, PyObject *name, int firstlineno,
+           PyObject *sandboxes, PyObject *filename, PyObject *name, int firstlineno,
            PyObject *lnotab)
 {
     return PyCode_NewWithPosOnlyArgs(argcount, 0, kwonlyargcount, nlocals,
                                      stacksize, flags, code, consts, names,
-                                     varnames, freevars, cellvars, filename,
+                                     varnames, freevars, cellvars, sandboxes, filename,
                                      name, firstlineno, lnotab);
 }
 
@@ -358,6 +361,7 @@ PyCode_NewEmpty(const char *filename, const char *funcname, int firstlineno)
                 nulltuple,                      /* varnames */
                 nulltuple,                      /* freevars */
                 nulltuple,                      /* cellvars */
+                PySet_New(NULL),                /* sandboxes */
                 filename_ob,                    /* filename */
                 funcname_ob,                    /* name */
                 firstlineno,                    /* firstlineno */
@@ -457,6 +461,7 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
     PyObject *varnames, *ourvarnames = NULL;
     PyObject *freevars = NULL, *ourfreevars = NULL;
     PyObject *cellvars = NULL, *ourcellvars = NULL;
+    PyObject *sandboxes;
     PyObject *filename;
     PyObject *name;
     int firstlineno;
@@ -527,12 +532,14 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
     if (ourcellvars == NULL)
         goto cleanup;
 
+    sandboxes = PySet_New(NULL);
+
     co = (PyObject *)PyCode_NewWithPosOnlyArgs(argcount, posonlyargcount,
                                                kwonlyargcount,
                                                nlocals, stacksize, flags,
                                                code, consts, ournames,
                                                ourvarnames, ourfreevars,
-                                               ourcellvars, filename,
+                                               ourcellvars, sandboxes, filename,
                                                name, firstlineno, lnotab);
   cleanup:
     Py_XDECREF(ournames);
@@ -672,7 +679,7 @@ code_replace_impl(PyCodeObject *self, int co_argcount,
     return (PyObject *)PyCode_NewWithPosOnlyArgs(
         co_argcount, co_posonlyargcount, co_kwonlyargcount, co_nlocals,
         co_stacksize, co_flags, (PyObject*)co_code, co_consts, co_names,
-        co_varnames, co_freevars, co_cellvars, co_filename, co_name,
+        co_varnames, co_freevars, co_cellvars, PySet_New(NULL), co_filename, co_name,
         co_firstlineno, (PyObject*)co_lnotab);
 }
 

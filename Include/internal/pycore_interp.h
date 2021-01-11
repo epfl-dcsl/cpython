@@ -93,6 +93,7 @@ struct _is {
     PyObject *sysdict;
     PyObject *builtins;
     PyObject *importlib;
+    PyObject *dependencies;
 
     /* Used in Modules/_threadmodule.c. */
     long num_threads;

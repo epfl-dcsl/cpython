@@ -169,6 +169,12 @@ struct compiler {
                                     This can be used to temporarily visit
                                     nodes without emitting bytecode to
                                     check only errors. */
+    int c_inside_sb;             /* ADDED THIS: If this value is different than
+                                    zero, it means it is in the body of some 
+                                    sandbox */
+    PyObject *c_sb_cache;        /* ADDED THIS: Python set holding package
+                                    dependencies during compilation of a
+                                    sandbox */
 
     PyObject *c_const_cache;     /* Python dict holding all constants,
                                     including names tuple */
@@ -312,6 +318,13 @@ compiler_init(struct compiler *c)
         Py_CLEAR(c->c_const_cache);
         return 0;
     }
+   // ADDED THIS
+    c->c_sb_cache = PySet_New(NULL);
+    if (!c->c_sb_cache) {
+        Py_CLEAR(c->c_const_cache);
+        Py_CLEAR(c->c_stack);
+        return 0;
+    }
 
     return 1;
 }
@@ -352,7 +365,8 @@ PyAST_CompileObject(mod_ty mod, PyObject *filename, PyCompilerFlags *flags,
     c.c_flags = flags;
     c.c_optimize = (optimize == -1) ? _Py_GetConfig()->optimization_level : optimize;
     c.c_nestlevel = 0;
-    c.c_do_not_emit_bytecode = 0;
+    c.c_do_not_emit_bytecode = 0;   
+    c.c_inside_sb = 0; // ADDED THIS (elsa)
 
     _PyASTOptimizeState state;
     state.optimize = c.c_optimize;
@@ -4149,6 +4163,17 @@ validate_keywords(struct compiler *c, asdl_seq *keywords)
 static int
 compiler_call(struct compiler *c, expr_ty e)
 {
+    /* ADDED THIS */
+    if (c->c_inside_sb) {
+        expr_ty meth = e->v.Call.func;
+        if (meth->kind == Attribute_kind 
+                && meth->v.Attribute.value->kind == Name_kind) {
+            PyObject_Print(meth->v.Attribute.value->v.Name.id, stdout, 0);
+            putchar('\n');
+            PySet_Add(c->c_sb_cache, meth->v.Attribute.value->v.Name.id); 
+        } 
+    }
+
     int ret = maybe_optimize_method_call(c, e);
     if (ret >= 0) {
         return ret;
@@ -5010,17 +5035,27 @@ compiler_sandbox(struct compiler *c, stmt_ty s)
     basicblock *block;
     assert(s->kind == Sandbox_kind);
     block = compiler_new_block(c);
-    if(!block)
+    
+    if (!block) {
         return 0;
-  /* Load sandbox arguments on the stack */
+    }
+    /* Load sandbox arguments on the stack */
     ADDOP_LOAD_CONST(c, s->v.Sandbox.mem);
     ADDOP_LOAD_CONST(c, s->v.Sandbox.sys);
+    ADDOP_I(c, SETUP_SANDBOX, 1);
 
-    ADDOP_I(c, SETUP_SANDBOX, 0);
     compiler_use_next_block(c, block);
 
+    c->c_inside_sb = 1;
+    printf("inside sandbox.. dependencies are the following:\n");
+
     /* BLOCK code */
-    VISIT_SEQ(c, stmt, s->v.Sandbox.body); // TODO c'est quoi stmt ??
+    VISIT_SEQ(c, stmt, s->v.Sandbox.body); // TODO maybe compile differently in order
+       // to remember which packages are used ? (i.e. which names are loaded that
+       // correspond to modules... but this seems a bit wanky)
+
+    ADDOP_I(c, SETUP_SANDBOX, 0);
+    c->c_inside_sb = 0;
     return 1;
 }
 
@@ -5116,6 +5151,13 @@ compiler_visit_expr1(struct compiler *c, expr_ty e)
         VISIT(c, expr, e->v.Attribute.value);
         switch (e->v.Attribute.ctx) {
         case Load:
+            /* ADDED THIS */
+            if (c->c_inside_sb && e->v.Attribute.value->kind == Name_kind) {
+                PyObject_Print(e->v.Attribute.value->v.Name.id, stdout, 0);
+                putchar('\n');
+                PySet_Add(c->c_sb_cache, e->v.Attribute.value->v.Name.id);
+            }
+            // -------------
             ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr, names);
             break;
         case Store:
@@ -5941,6 +5983,7 @@ makecode(struct compiler *c, struct assembler *a)
     PyObject *freevars = NULL;
     PyObject *cellvars = NULL;
     PyObject *bytecode = NULL;
+    PyObject *sandboxes = NULL; // ADDED THIS
     Py_ssize_t nlocals;
     int nlocals_int;
     int flags;
@@ -5979,6 +6022,8 @@ makecode(struct compiler *c, struct assembler *a)
     if (!bytecode)
         goto error;
 
+    sandboxes = c->c_sb_cache; // TODO some pre-processing ?
+
     tmp = PyList_AsTuple(consts); /* PyCode_New requires a tuple */
     if (!tmp)
         goto error;
@@ -5998,7 +6043,7 @@ makecode(struct compiler *c, struct assembler *a)
     co = PyCode_NewWithPosOnlyArgs(posonlyargcount+posorkeywordargcount,
                                    posonlyargcount, kwonlyargcount, nlocals_int,
                                    maxdepth, flags, bytecode, consts, names,
-                                   varnames, freevars, cellvars, c->c_filename,
+                                   varnames, freevars, cellvars, sandboxes, c->c_filename,
                                    c->u->u_name, c->u->u_firstlineno, a->a_lnotab);
  error:
     Py_XDECREF(consts);

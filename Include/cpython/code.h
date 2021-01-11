@@ -30,6 +30,7 @@ struct PyCodeObject {
     PyObject *co_varnames;      /* tuple of strings (local variable names) */
     PyObject *co_freevars;      /* tuple of strings (free variable names) */
     PyObject *co_cellvars;      /* tuple of strings (cell variable names) */
+    PyObject *co_sandboxes;
     /* The rest aren't used in either hash or comparisons, except for co_name,
        used in both. This is done to preserve the name and line number
        for tracebacks and debuggers; otherwise, constant de-duplication
@@ -116,12 +117,12 @@ PyAPI_DATA(PyTypeObject) PyCode_Type;
 /* Public interface */
 PyAPI_FUNC(PyCodeObject *) PyCode_New(
         int, int, int, int, int, PyObject *, PyObject *,
-        PyObject *, PyObject *, PyObject *, PyObject *,
+        PyObject *, PyObject *, PyObject *, PyObject *, PyObject *,
         PyObject *, PyObject *, int, PyObject *);
 
 PyAPI_FUNC(PyCodeObject *) PyCode_NewWithPosOnlyArgs(
         int, int, int, int, int, int, PyObject *, PyObject *,
-        PyObject *, PyObject *, PyObject *, PyObject *,
+        PyObject *, PyObject *, PyObject *, PyObject *, PyObject *,
         PyObject *, PyObject *, int, PyObject *);
         /* same as struct above */
 
