@@ -27,6 +27,7 @@ PyAPI_FUNC(PyObject *) PyModule_GetNameObject(PyObject *);
 PyAPI_FUNC(const char *) PyModule_GetName(PyObject *);
 Py_DEPRECATED(3.2) PyAPI_FUNC(const char *) PyModule_GetFilename(PyObject *);
 PyAPI_FUNC(PyObject *) PyModule_GetFilenameObject(PyObject *);
+PyAPI_FUNC(int64_t) PyModule_GetId(PyObject *); // (elsa) ADDED THIS
 #ifndef Py_LIMITED_API
 PyAPI_FUNC(void) _PyModule_Clear(PyObject *);
 PyAPI_FUNC(void) _PyModule_ClearDict(PyObject *);

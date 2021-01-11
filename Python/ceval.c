@@ -32,6 +32,8 @@
 
 #include <ctype.h>
 
+#include "liblitterbox.h"
+
 #ifdef Py_DEBUG
 /* For debugging the interpreter: */
 #define LLTRACE  1      /* Low-level trace feature */
@@ -3401,16 +3403,27 @@ main_loop:
         
         /* ADDED THIS */
         case TARGET(SETUP_SANDBOX): {
+            PyObject *uid = POP();
+            PyObject *id_str = PyObject_Str(uid);
+            if (id_str == NULL) {
+                goto error;
+            }
+            const char *sid = PyUnicode_AsUTF8(id_str);
+
             if (oparg) {
-              printf("%s", "call prolog: arg mem=");
-              PyObject *mem = *(stack_pointer - 2);
-              PyObject_Print(mem, stdout, 0); // convenient but just to print
-              putchar('\n');
-              fflush(stdout);
-              stack_pointer = stack_pointer-2; // TODO ?? so that they are "consumed"
+                PyObject *sys = POP();
+                PyObject *mem = POP();
+                PyObject *dep = PyDict_GetItemWithError(sandboxes, uid);
+                if (dep == NULL) {
+                    fprintf(stderr, "Could not find dependency for sandbox\n");
+                    exit(1);
+                }
+                // Let's register the sandbox.
+                SB_RegisterSandbox((char*)sid,(char*)PyUnicode_AsUTF8(mem),
+                    (char*)PyUnicode_AsUTF8(sys));
+                SB_Prolog((char*)sid);
             } else {
-              printf("%s\n", "call epilog");
-              fflush(stdout);
+                SB_Epilog((char*)sid);
             }
             DISPATCH();
         }
@@ -5202,21 +5215,25 @@ import_name(PyThreadState *tstate, PyFrameObject *f,
         return NULL;
     }
     
-    // TODO remove this
+    /* (elsa) ADDED THIS */
     PyObject *pkgname = _PyDict_GetItemIdWithError(f->f_globals, &PyId___name__);
     PyObject *dep;
 
-    //printf("in import_name (");
+    if (name != NULL && pkgname != NULL) {
+      SB_RegisterDependency((char*)PyUnicode_AsUTF8(pkgname), (char*)PyUnicode_AsUTF8(name));
+    }
+
+    //(aghosn) there is the default import
     if (pkgname != NULL && PyUnicode_Check(pkgname)) {
-        //PyObject_Print(pkgname, stdout, 0);
         dep = PyDict_GetItemWithError(tstate->interp->dependencies, pkgname);
         if (dep == NULL) {
             dep = PySet_New(NULL);
         }
-        PySet_Add(dep, name); // should check validity
+        PySet_Add(dep, name); // TODO should check validity
 
         PyObject_SetItem(tstate->interp->dependencies, pkgname, dep);
     }
+    /* ---------------- */
 
     /* Fast path for not overloaded __import__. */
     if (import_func == tstate->interp->import_func) {

@@ -1,6 +1,8 @@
 /* Minimal main program -- everything is loaded from the library */
 
 #include "Python.h"
+#include "smalloc.h"
+#include "liblitterbox.h"
 
 #ifdef MS_WINDOWS
 int
@@ -12,6 +14,18 @@ wmain(int argc, wchar_t **argv)
 int
 main(int argc, char **argv)
 {
-    return Py_BytesMain(argc, argv);
+    /* (elsa) ADDED THIS */
+    int ret;
+    /*(aghosn) init the dynamic backend, reads the env-var from go.*/
+    SB_Initialize();
+    register_region = &SB_RegisterRegion; 
+    register_growth = &SB_RegisterGrowth;
+    if (!sm_pools_init(100, 10, sysconf(_SC_PAGESIZE))) // TODO have default values somewhere ?
+        return 1;
+
+    ret = Py_BytesMain(argc, argv);
+
+    sm_release_pools();
+    return ret;
 }
 #endif

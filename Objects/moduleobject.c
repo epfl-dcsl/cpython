@@ -6,6 +6,9 @@
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
 #include "structmember.h"         // PyMemberDef
 
+#include "smalloc.h" // (elsa) ADDED THIS
+#include "liblitterbox.h"
+
 static Py_ssize_t max_module_number;
 
 _Py_IDENTIFIER(__doc__);
@@ -19,6 +22,7 @@ typedef struct {
     void *md_state;
     PyObject *md_weaklist;
     PyObject *md_name;  /* for logging purposes after md_dict is cleared */
+    int64_t md_id; // (elsa) ADDED THIS
 } PyModuleObject;
 
 static PyMemberDef module_members[] = {
@@ -84,14 +88,25 @@ PyObject *
 PyModule_NewObject(PyObject *name)
 {
     PyModuleObject *m;
-    m = PyObject_GC_New(PyModuleObject, &PyModule_Type);
+    // (elsa) ADDED THIS
+    int64_t id;
+    if ((id = sm_add_mpool(PyUnicode_AsUTF8(name))) < 0) {
+        fprintf(stderr, "module-object: error while adding a new pool\n");
+    }
+    //m = PyObject_GC_New(PyModuleObject, &PyModule_Type);
+    m = PyObject_GC_NewFromPool(PyModuleObject, &PyModule_Type, id);
+
     if (m == NULL)
         return NULL;
     m->md_def = NULL;
     m->md_state = NULL;
     m->md_weaklist = NULL;
     m->md_name = NULL;
-    m->md_dict = PyDict_New();
+    m->md_dict = PyDict_NewFromPool(id);
+    m->md_id = id; // ADDED THIS
+    assert(name != NULL && PyUnicode_Check(name));
+    //(aghosn) Registration done here allows to keep names as well.
+    SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
     if (module_init_dict(m, m->md_dict, name, NULL) != 0)
         goto fail;
     PyObject_GC_Track(m);
@@ -552,6 +567,18 @@ PyModule_GetState(PyObject* m)
     return ((PyModuleObject *)m)->md_state;
 }
 
+/* (elsa) ADDED THIS */
+int64_t
+PyModule_GetId(PyObject *m)
+{
+    if (!PyModule_Check(m)) {
+        PyErr_BadArgument();
+        return -1;
+    }
+    return ((PyModuleObject *)m)->md_id;
+}
+/* ----------------- */
+
 void
 _PyModule_Clear(PyObject *m)
 {
@@ -645,15 +672,29 @@ static int
 module___init___impl(PyModuleObject *self, PyObject *name, PyObject *doc)
 /*[clinic end generated code: output=e7e721c26ce7aad7 input=57f9e177401e5e1e]*/
 {
+    // (elsa) ADDED THIS
+    PyInterpreterState *interp = _PyInterpreterState_Get();
+    if (interp->md_ids.sp >= 200) {
+        fprintf(stderr, "MODULE IDS STACK OVERFLOW!!\n");
+        return -1;
+    }
+    int64_t id = interp->md_ids.stack[interp->md_ids.sp++];
+    self->md_id = id;
+    //(aghosn) Registering the package id.
+    if (name != NULL && PyUnicode_Check(name)) {
+      SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
+    }
+
     PyObject *dict = self->md_dict;
     if (dict == NULL) {
-        dict = PyDict_New();
+        dict = PyDict_NewFromPool(id);
         if (dict == NULL)
             return -1;
         self->md_dict = dict;
     }
     if (module_init_dict(self, dict, name, doc) < 0)
         return -1;
+
     return 0;
 }
 
@@ -678,7 +719,8 @@ module_dealloc(PyModuleObject *m)
     Py_XDECREF(m->md_name);
     if (m->md_state != NULL)
         PyMem_FREE(m->md_state);
-    Py_TYPE(m)->tp_free((PyObject *)m);
+    //Py_TYPE(m)->tp_free((PyObject *)m);
+    PyObject_GC_DelFromPool((PyObject *)m, m->md_id);
 }
 
 static PyObject *

@@ -34,6 +34,8 @@ typedef struct {
     PyObject *func_qualname;    /* The qualified name */
     vectorcallfunc vectorcall;
 
+    int64_t pool_id; // (elsa) ADDED THIS: memory pool id
+
     /* Invariant:
      *     func_closure contains the bindings for func_code->co_freevars, so
      *     PyTuple_Size(func_closure) == PyCode_GetNumFree(func_code)

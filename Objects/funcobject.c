@@ -19,6 +19,10 @@ PyFunction_NewWithQualName(PyObject *code, PyObject *globals, PyObject *qualname
         if (__name__ == NULL)
             return NULL;
     }
+    // (elsa) ADDED THIS
+    PyInterpreterState *interp = _PyInterpreterState_Get();
+    int64_t id = interp->md_ids.stack[interp->md_ids.sp-1];
+    op = PyObject_GC_NewFromPool(PyFunctionObject, &PyFunction_Type, id);
 
     /* __module__: If module name is in globals, use it.
        Otherwise, use None. */
@@ -50,6 +54,7 @@ PyFunction_NewWithQualName(PyObject *code, PyObject *globals, PyObject *qualname
     op->func_closure = NULL;
     op->vectorcall = _PyFunction_Vectorcall;
     op->func_module = module;
+    op->pool_id = id; // (elsa) ADDED THIS
 
     consts = ((PyCodeObject *)code)->co_consts;
     if (PyTuple_Size(consts) >= 1) {
@@ -594,7 +599,9 @@ func_dealloc(PyFunctionObject *op)
         PyObject_ClearWeakRefs((PyObject *) op);
     }
     (void)func_clear(op);
-    PyObject_GC_Del(op);
+    //PyObject_GC_Del(op);
+    PyObject_GC_DelFromPool(op, op->pool_id);
+
 }
 
 static PyObject*

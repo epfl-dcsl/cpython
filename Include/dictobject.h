@@ -19,6 +19,7 @@ PyAPI_DATA(PyTypeObject) PyDict_Type;
 #define PyDict_CheckExact(op) Py_IS_TYPE(op, &PyDict_Type)
 
 PyAPI_FUNC(PyObject *) PyDict_New(void);
+PyObject *PyDict_NewFromPool(int64_t); // (elsa) ADDED THIS
 PyAPI_FUNC(PyObject *) PyDict_GetItem(PyObject *mp, PyObject *key);
 PyAPI_FUNC(PyObject *) PyDict_GetItemWithError(PyObject *mp, PyObject *key);
 PyAPI_FUNC(int) PyDict_SetItem(PyObject *mp, PyObject *key, PyObject *item);

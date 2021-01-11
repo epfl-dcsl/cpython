@@ -11,6 +11,8 @@
 
 #include <ctype.h>
 
+#include "smalloc.h" // (elsa) ADDED THIS
+
 /*[clinic input]
 class type "PyTypeObject *" "&PyType_Type"
 class object "PyObject *" "&PyBaseObject_Type"
@@ -1042,9 +1044,27 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
     PyObject *obj;
     const size_t size = _PyObject_VAR_SIZE(type, nitems+1);
     /* note that we need to add one, for the sentinel */
+    int64_t id;
 
     if (_PyType_IS_GC(type)) {
-        obj = _PyObject_GC_Malloc(size);
+        // (elsa) ADDED THIS
+        if (type == &PyModule_Type) {
+            PyInterpreterState *interp = _PyInterpreterState_Get();
+            //id = interp->genmd_id++; // TODO make it so that the library gives the ids
+
+            if ((id = sm_add_mpool(type->tp_name)) < 0) {
+                fprintf(stderr, "type-object: error while adding a new pool\n");
+            }
+
+            obj = _PyObject_GC_Malloc(size, id); // TODO change arg
+
+            // TODO: add ID on top of stack
+            interp->md_ids.stack[interp->md_ids.sp] = id;
+        }
+        else {
+            obj = _PyObject_GC_Malloc(size, -1); // ADDED default arg
+        }
+
     }
     else {
         obj = (PyObject *)PyObject_MALLOC(size);

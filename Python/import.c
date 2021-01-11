@@ -1416,6 +1416,10 @@ PyImport_ImportFrozenModuleObject(PyObject *name)
     ispackage = (size < 0);
     if (ispackage)
         size = -size;
+    
+    // (elsa) ADDED THIS since we use the stack in marshal and _frozen_importlib
+    // is not yet a module with its own pool... so "borrow" it on sys
+    tstate->interp->md_ids.sp++;
     co = PyMarshal_ReadObjectFromString((const char *)p->code, size);
     if (co == NULL)
         return -1;

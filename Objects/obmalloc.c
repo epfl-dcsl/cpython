@@ -2,7 +2,7 @@
 #include "pycore_pymem.h"         // _PyTraceMalloc_Config
 
 #include <stdbool.h>
-
+#include "smalloc.h" // (elsa) ADDED THIS
 
 /* Defined in tracemalloc.c */
 extern void _PyMem_DumpTraceback(int fd, const void *ptr);
@@ -152,6 +152,12 @@ _PyObject_ArenaMmap(void *ctx, size_t size)
     if (ptr == MAP_FAILED)
         return NULL;
     assert(ptr != NULL);
+    //(aghosn) catch the mmap.
+    if (register_growth != NULL) {
+      register_growth(1, ptr, size);
+    } else {
+      fprintf(stderr, "There is a missing mmap error\n");
+    }
     return ptr;
 }
 
@@ -685,6 +691,16 @@ PyObject_Malloc(size_t size)
     return _PyObject.malloc(_PyObject.ctx, size);
 }
 
+/* (elsa) ADDED THIS */
+void *
+PyObject_MallocFromPool(size_t size, int64_t pool_id)
+{
+    if (size > (size_t)PY_SSIZE_T_MAX)
+        return NULL;
+    return sm_malloc_from_pool(pool_id, size);
+}
+/* ----------------- */
+
 void *
 PyObject_Calloc(size_t nelem, size_t elsize)
 {
@@ -708,6 +724,16 @@ PyObject_Free(void *ptr)
 {
     _PyObject.free(_PyObject.ctx, ptr);
 }
+
+
+/* (elsa) ADDED THIS */
+void
+PyObject_FreeFromPool(void *ptr, int64_t pool_id)
+{
+    return sm_free_from_pool(pool_id, ptr);
+}
+/* ----------------- */
+
 
 
 /* If we're using GCC, use __builtin_expect() to reduce overhead of

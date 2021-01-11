@@ -95,11 +95,13 @@ PyObject_{New, NewVar, Del}.
    the raw memory.
 */
 PyAPI_FUNC(void *) PyObject_Malloc(size_t size);
+void * PyObject_MallocFromPool(size_t size, int64_t pool_id); // (elsa) ADDED THIS (should also be API?)
 #if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 >= 0x03050000
 PyAPI_FUNC(void *) PyObject_Calloc(size_t nelem, size_t elsize);
 #endif
 PyAPI_FUNC(void *) PyObject_Realloc(void *ptr, size_t new_size);
 PyAPI_FUNC(void) PyObject_Free(void *ptr);
+void PyObject_FreeFromPool(void *ptr, int64_t pool_id); // (elsa) ADDED THIS
 
 
 /* Macros */
@@ -133,6 +135,11 @@ PyAPI_FUNC(PyVarObject *) _PyObject_NewVar(PyTypeObject *, Py_ssize_t);
 
 // Alias to PyObject_New(). In Python 3.8, PyObject_NEW() called directly
 // PyObject_MALLOC() with _PyObject_VAR_SIZE().
+/* (elsa) ADDED THIS */
+#define PyObject_NEWFromPool(type, typeobj, pool_id) \
+( (type *) PyObject_Init( \
+    (PyObject *) PyObject_MallocFromPool( _PyObject_SIZE(typeobj), pool_id ), (typeobj)) )
+
 #define PyObject_NEW_VAR(type, typeobj, n) PyObject_NewVar(type, typeobj, n)
 
 
@@ -166,7 +173,7 @@ PyAPI_FUNC(PyVarObject *) _PyObject_GC_Resize(PyVarObject *, Py_ssize_t);
 
 
 
-PyAPI_FUNC(PyObject *) _PyObject_GC_New(PyTypeObject *);
+PyAPI_FUNC(PyObject *) _PyObject_GC_New(PyTypeObject *, int64_t); // (elsa) ADDED arg
 PyAPI_FUNC(PyVarObject *) _PyObject_GC_NewVar(PyTypeObject *, Py_ssize_t);
 
 /* Tell the GC to track this object.
@@ -180,9 +187,12 @@ PyAPI_FUNC(void) PyObject_GC_Track(void *);
 PyAPI_FUNC(void) PyObject_GC_UnTrack(void *);
 
 PyAPI_FUNC(void) PyObject_GC_Del(void *);
+void PyObject_GC_DelFromPool(void *, int64_t); // (elsa) ADDED THIS
 
 #define PyObject_GC_New(type, typeobj) \
-                ( (type *) _PyObject_GC_New(typeobj) )
+                ( (type *) _PyObject_GC_New(typeobj, -1) )
+#define PyObject_GC_NewFromPool(type, typeobj, pool_id) \
+                ( (type *) _PyObject_GC_New(typeobj, pool_id) ) // (elsa) ADDED THIS
 #define PyObject_GC_NewVar(type, typeobj, n) \
                 ( (type *) _PyObject_GC_NewVar((typeobj), (n)) )
 

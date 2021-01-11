@@ -985,6 +985,15 @@ builtin_exec_impl(PyObject *module, PyObject *source, PyObject *globals,
 {
     PyObject *v;
 
+    // (elsa) TEST
+    _Py_IDENTIFIER(__name__);
+    PyInterpreterState *interp = _PyInterpreterState_Get();
+    PyObject *md_name = _PyDict_GetItemIdWithError(globals, &PyId___name__);
+    PyObject *maybe_module = NULL;
+    if (md_name != NULL) {
+     maybe_module =  PyDict_GetItemWithError(interp->modules, md_name);
+    }
+
     if (globals == Py_None) {
         globals = PyEval_GetGlobals();
         if (locals == Py_None) {
@@ -1033,6 +1042,10 @@ builtin_exec_impl(PyObject *module, PyObject *source, PyObject *globals,
             return NULL;
         }
         v = PyEval_EvalCode(source, globals, locals);
+        
+        if (maybe_module != NULL) {
+            interp->md_ids.sp--; // Leave scope
+        }
     }
     else {
         PyObject *source_copy;
