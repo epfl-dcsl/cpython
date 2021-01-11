@@ -3396,6 +3396,18 @@ main_loop:
             PUSH(res);
             DISPATCH();
         }
+        
+        /* ADDED THIS */
+        case TARGET(SETUP_SANDBOX): {
+            if (oparg) {
+              printf("%s\n", "call prolog");
+              fflush(stdout);
+            } else {
+              printf("%s\n", "call epilog");
+              fflush(stdout);
+            }
+            DISPATCH();
+        }
 
         case TARGET(WITH_EXCEPT_START): {
             /* At the top of the stack are 7 values:

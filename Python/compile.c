@@ -1118,6 +1118,8 @@ stack_effect(int opcode, int oparg, int jump)
         case DICT_MERGE:
         case DICT_UPDATE:
             return -1;
+        case SETUP_SANDBOX:
+            return 0;
         default:
             return PY_INVALID_STACK_EFFECT;
     }
@@ -5005,28 +5007,23 @@ compiler_with(struct compiler *c, stmt_ty s, int pos)
 static int
 compiler_sandbox(struct compiler *c, stmt_ty s)
 {
-    basicblock *block, *final, *exit;
+    //basicblock *block, *final, *exit;
+    basicblock *block;
 
     assert(s->kind == Sandbox_kind);
 
     block = compiler_new_block(c);
-    final = compiler_new_block(c);
-    exit = compiler_new_block(c);
-    if (!block || !final || !exit)
+    //final = compiler_new_block(c);
+    //exit = compiler_new_block(c);
+    //if (!block || !final || !exit)
+    if(!block)
         return 0;
 
-    // ADDOP_JREL ???
-    // create a new op ???
-    // TODO look at what SETUP_WITH does
-
+    ADDOP_I(c, SETUP_SANDBOX, 0);
     compiler_use_next_block(c, block);
 
     /* BLOCK code */
     VISIT_SEQ(c, stmt, s->v.Sandbox.body); // TODO c'est quoi stmt ??
-
-    // TODO handle exceptions ?? -> use final block
-
-    compiler_use_next_block(c, exit);
     return 1;
 }
 

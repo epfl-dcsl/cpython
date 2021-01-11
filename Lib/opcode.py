@@ -214,4 +214,6 @@ def_op('SET_UPDATE', 163)
 def_op('DICT_MERGE', 164)
 def_op('DICT_UPDATE', 165)
 
+jrel_op('SETUP_SANDBOX', 166) # ADDED THIS (for now defined as jrel, will see later)
+
 del def_op, name_op, jrel_op, jabs_op
