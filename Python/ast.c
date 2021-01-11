@@ -421,6 +421,8 @@ validate_stmt(stmt_ty stmt)
                 return 0;
         }
         return validate_body(stmt->v.AsyncWith.body, "AsyncWith");
+    case Sandbox_kind:
+        return validate_body(stmt->v.Sandbox.body, "Sandbox");
     case Raise_kind:
         if (stmt->v.Raise.exc) {
             return validate_expr(stmt->v.Raise.exc, Load) &&
@@ -574,6 +576,7 @@ static stmt_ty ast_for_classdef(struct compiling *, const node *, asdl_seq *);
 
 static stmt_ty ast_for_with_stmt(struct compiling *, const node *, bool);
 static stmt_ty ast_for_for_stmt(struct compiling *, const node *, bool);
+static stmt_ty ast_for_sandbox(struct compiling *, const node *);
 
 /* Note different signature for ast_for_call */
 static expr_ty ast_for_call(struct compiling *, const node *, expr_ty,
@@ -4457,6 +4460,8 @@ ast_for_stmt(struct compiling *c, const node *n)
                 return ast_for_try_stmt(c, ch);
             case with_stmt:
                 return ast_for_with_stmt(c, ch, 0);
+            case sandbox_stmt:
+                return ast_for_sandbox(c, ch);
             case funcdef:
                 return ast_for_funcdef(c, ch, NULL);
             case classdef:
@@ -4472,6 +4477,27 @@ ast_for_stmt(struct compiling *c, const node *n)
                 return NULL;
         }
     }
+}
+
+/* ADDED THIS */
+/* sandbox_stmt: 'sandbox' ':' suite */
+static stmt_ty
+ast_for_sandbox(struct compiling *c, const node *n)
+{
+    /* notes: 
+    * - NCH returns the number of children
+    * - REQ verifies that the node indeed has the expected type
+    */
+    int end_lineno, end_col_offset;
+    REQ(n, sandbox_stmt);
+
+    asdl_seq * body = ast_for_suite(c, CHILD(n, NCH(n) - 1)); 
+    if (!body)
+        return NULL;
+    get_last_end_pos(body, &end_lineno, &end_col_offset);
+
+    return Sandbox(body, LINENO(n), n->n_col_offset, 
+              end_lineno, end_col_offset, c->c_arena);
 }
 
 static PyObject *

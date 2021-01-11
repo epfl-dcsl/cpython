@@ -110,6 +110,7 @@ typedef struct {
     PyObject *RShift_type;
     PyObject *Raise_type;
     PyObject *Return_type;
+    PyObject *Sandbox_type;
     PyObject *SetComp_type;
     PyObject *Set_type;
     PyObject *Slice_type;
@@ -355,6 +356,7 @@ void _PyAST_Fini()
     Py_CLEAR(state->RShift_type);
     Py_CLEAR(state->Raise_type);
     Py_CLEAR(state->Return_type);
+    Py_CLEAR(state->Sandbox_type);
     Py_CLEAR(state->SetComp_type);
     Py_CLEAR(state->Set_type);
     Py_CLEAR(state->Slice_type);
@@ -649,6 +651,9 @@ static const char * const AsyncWith_fields[]={
     "items",
     "body",
     "type_comment",
+};
+static const char * const Sandbox_fields[]={
+    "body",
 };
 static const char * const Raise_fields[]={
     "exc",
@@ -1245,6 +1250,7 @@ static int init_types(astmodulestate *state)
         "     | If(expr test, stmt* body, stmt* orelse)\n"
         "     | With(withitem* items, stmt* body, string? type_comment)\n"
         "     | AsyncWith(withitem* items, stmt* body, string? type_comment)\n"
+        "     | Sandbox(stmt* body)\n"
         "     | Raise(expr? exc, expr? cause)\n"
         "     | Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)\n"
         "     | Assert(expr test, expr? msg)\n"
@@ -1347,6 +1353,10 @@ static int init_types(astmodulestate *state)
     if (PyObject_SetAttr(state->AsyncWith_type, state->type_comment, Py_None)
         == -1)
         return 0;
+    state->Sandbox_type = make_type(state, "Sandbox", state->stmt_type,
+                                    Sandbox_fields, 1,
+        "Sandbox(stmt* body)");
+    if (!state->Sandbox_type) return 0;
     state->Raise_type = make_type(state, "Raise", state->stmt_type,
                                   Raise_fields, 2,
         "Raise(expr? exc, expr? cause)");
@@ -2331,6 +2341,23 @@ AsyncWith(asdl_seq * items, asdl_seq * body, string type_comment, int lineno,
     p->v.AsyncWith.items = items;
     p->v.AsyncWith.body = body;
     p->v.AsyncWith.type_comment = type_comment;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+stmt_ty
+Sandbox(asdl_seq * body, int lineno, int col_offset, int end_lineno, int
+        end_col_offset, PyArena *arena)
+{
+    stmt_ty p;
+    p = (stmt_ty)PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = Sandbox_kind;
+    p->v.Sandbox.body = body;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -3775,6 +3802,16 @@ ast2obj_stmt(astmodulestate *state, void* _o)
         value = ast2obj_string(state, o->v.AsyncWith.type_comment);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->type_comment, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case Sandbox_kind:
+        tp = (PyTypeObject *)state->Sandbox_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_list(state, o->v.Sandbox.body, ast2obj_stmt);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->body, value) == -1)
             goto failed;
         Py_DECREF(value);
         break;
@@ -6497,6 +6534,52 @@ obj2ast_stmt(astmodulestate *state, PyObject* obj, stmt_ty* out, PyArena* arena)
         }
         *out = AsyncWith(items, body, type_comment, lineno, col_offset,
                          end_lineno, end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    tp = state->Sandbox_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return 1;
+    }
+    if (isinstance) {
+        asdl_seq* body;
+
+        if (_PyObject_LookupAttr(obj, state->body, &tmp) < 0) {
+            return 1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"body\" missing from Sandbox");
+            return 1;
+        }
+        else {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "Sandbox field \"body\" must be a list, not a %.200s", _PyType_Name(Py_TYPE(tmp)));
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            body = _Py_asdl_seq_new(len, arena);
+            if (body == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                stmt_ty val;
+                PyObject *tmp2 = PyList_GET_ITEM(tmp, i);
+                Py_INCREF(tmp2);
+                res = obj2ast_stmt(state, tmp2, &val, arena);
+                Py_DECREF(tmp2);
+                if (res != 0) goto failed;
+                if (len != PyList_GET_SIZE(tmp)) {
+                    PyErr_SetString(PyExc_RuntimeError, "Sandbox field \"body\" changed size during iteration");
+                    goto failed;
+                }
+                asdl_seq_SET(body, i, val);
+            }
+            Py_CLEAR(tmp);
+        }
+        *out = Sandbox(body, lineno, col_offset, end_lineno, end_col_offset,
+                       arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -9731,6 +9814,10 @@ astmodule_exec(PyObject *m)
         return -1;
     }
     Py_INCREF(state->AsyncWith_type);
+    if (PyModule_AddObject(m, "Sandbox", state->Sandbox_type) < 0) {
+        return -1;
+    }
+    Py_INCREF(state->Sandbox_type);
     if (PyModule_AddObject(m, "Raise", state->Raise_type) < 0) {
         return -1;
     }

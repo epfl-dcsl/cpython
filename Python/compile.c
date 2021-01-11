@@ -210,6 +210,8 @@ static int compiler_call_helper(struct compiler *c, int n,
 static int compiler_try_except(struct compiler *, stmt_ty);
 static int compiler_set_qualname(struct compiler *);
 
+static int compiler_sandbox(struct compiler *, stmt_ty); /* ADDED THIS */
+
 static int compiler_sync_comprehension_generator(
                                       struct compiler *c,
                                       asdl_seq *generators, int gen_index,
@@ -1591,6 +1593,9 @@ find_ann(asdl_seq *stmts)
             break;
         case AsyncWith_kind:
             res = find_ann(st->v.AsyncWith.body);
+            break;
+        case Sandbox_kind:
+            res = find_ann(st->v.Sandbox.body);
             break;
         case Try_kind:
             for (j = 0; j < asdl_seq_LEN(st->v.Try.handlers); j++) {
@@ -3445,6 +3450,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         return compiler_continue(c);
     case With_kind:
         return compiler_with(c, s, 0);
+    case Sandbox_kind:
+        return compiler_sandbox(c, s);
     case AsyncFunctionDef_kind:
         return compiler_function(c, s, 1);
     case AsyncWith_kind:
@@ -4982,6 +4989,42 @@ compiler_with(struct compiler *c, stmt_ty s, int pos)
 
     ADDOP(c, WITH_EXCEPT_START);
     compiler_with_except_finish(c);
+
+    compiler_use_next_block(c, exit);
+    return 1;
+}
+
+/* ADDED THIS */
+/* 
+    sandbox:
+        BLOCK
+    is implemented as:
+        ???
+  */
+// TODO add better comment
+static int
+compiler_sandbox(struct compiler *c, stmt_ty s)
+{
+    basicblock *block, *final, *exit;
+
+    assert(s->kind == Sandbox_kind);
+
+    block = compiler_new_block(c);
+    final = compiler_new_block(c);
+    exit = compiler_new_block(c);
+    if (!block || !final || !exit)
+        return 0;
+
+    // ADDOP_JREL ???
+    // create a new op ???
+    // TODO look at what SETUP_WITH does
+
+    compiler_use_next_block(c, block);
+
+    /* BLOCK code */
+    VISIT_SEQ(c, stmt, s->v.Sandbox.body); // TODO c'est quoi stmt ??
+
+    // TODO handle exceptions ?? -> use final block
 
     compiler_use_next_block(c, exit);
     return 1;

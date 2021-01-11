@@ -111,7 +111,7 @@ global_stmt: 'global' NAME (',' NAME)*
 nonlocal_stmt: 'nonlocal' NAME (',' NAME)*
 assert_stmt: 'assert' test [',' test]
 
-compound_stmt: if_stmt | while_stmt | for_stmt | try_stmt | with_stmt | funcdef | classdef | decorated | async_stmt
+compound_stmt: if_stmt | while_stmt | for_stmt | try_stmt | with_stmt | funcdef | classdef | decorated | async_stmt | sandbox_stmt
 async_stmt: ASYNC (funcdef | with_stmt | for_stmt)
 if_stmt: 'if' namedexpr_test ':' suite ('elif' namedexpr_test ':' suite)* ['else' ':' suite]
 while_stmt: 'while' namedexpr_test ':' suite ['else' ':' suite]
@@ -125,6 +125,7 @@ with_stmt: 'with' with_item (',' with_item)*  ':' [TYPE_COMMENT] suite
 with_item: test ['as' expr]
 # NB compile.c makes sure that the default except clause is last
 except_clause: 'except' [test ['as' NAME]]
+sandbox_stmt: "sandbox" ':' suite
 suite: simple_stmt | NEWLINE INDENT stmt+ DEDENT
 
 namedexpr_test: test [':=' test]
