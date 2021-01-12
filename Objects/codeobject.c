@@ -230,6 +230,7 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
             PyMem_FREE(cell2arg);
         return NULL;
     }
+    co->pool_id = pool_id;
     co->co_argcount = argcount;
     co->co_posonlyargcount = posonlyargcount;
     co->co_kwonlyargcount = kwonlyargcount;

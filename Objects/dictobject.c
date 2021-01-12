@@ -616,7 +616,7 @@ new_dict(PyDictKeysObject *keys, PyObject **values, int64_t pool_id) // (elsa) A
     PyDictObject *mp;
     assert(keys != NULL);
 #if PyDict_MAXFREELIST > 0
-    if (numfree) {
+    if (numfree && pool_id < 0) {
         mp = free_list[--numfree];
         assert (mp != NULL);
         assert (Py_IS_TYPE(mp, &PyDict_Type));

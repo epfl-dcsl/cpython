@@ -6,6 +6,7 @@
 
 #include "smalloc_i.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 void sm_free_pool(struct smalloc_pool *spool, void *p)
 {
@@ -65,6 +66,8 @@ void sm_free_from_pool(int64_t id, void *p)
             return;
         }
     }
-    fprintf(stderr, "smalloc-free: No corresponding pool was found!! %ld \n", id);
+    fprintf(stderr, "smalloc-free: No corresponding pool was found!! %ld -- %p \n", id, p);
+    //const char* s = getenv("DBG_FREE");
+    //while (s != NULL) {}
 }
 
