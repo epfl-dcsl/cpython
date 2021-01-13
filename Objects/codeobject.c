@@ -275,12 +275,12 @@ PyCode_New(int argcount, int kwonlyargcount,
            int nlocals, int stacksize, int flags,
            PyObject *code, PyObject *consts, PyObject *names,
            PyObject *varnames, PyObject *freevars, PyObject *cellvars,
-           PyObject *sandboxes, PyObject *filename, PyObject *name, int firstlineno,
+           /*PyObject *sandboxes,*/ PyObject *filename, PyObject *name, int firstlineno,
            PyObject *lnotab)
 {
     return PyCode_NewWithPosOnlyArgs(argcount, 0, kwonlyargcount, nlocals,
                                      stacksize, flags, code, consts, names,
-                                     varnames, freevars, cellvars, sandboxes, filename,
+                                     varnames, freevars, cellvars, /*sandboxes*/ PyDict_New(), filename,
                                      name, firstlineno, lnotab);
 }
 
@@ -351,7 +351,6 @@ PyCode_NewEmpty(const char *filename, const char *funcname, int firstlineno)
     filename_ob = PyUnicode_DecodeFSDefault(filename);
     if (filename_ob == NULL)
         goto failed;
-
     result = PyCode_NewWithPosOnlyArgs(
                 0,                    /* argcount */
                 0,                              /* posonlyargcount */
@@ -537,7 +536,6 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
         goto cleanup;
 
     sandboxes = PySet_New(NULL);
-
     co = (PyObject *)PyCode_NewWithPosOnlyArgs(argcount, posonlyargcount,
                                                kwonlyargcount,
                                                nlocals, stacksize, flags,
@@ -680,7 +678,6 @@ code_replace_impl(PyCodeObject *self, int co_argcount,
                     co_stacksize, co_flags) < 0) {
         return NULL;
     }
-
     return (PyObject *)PyCode_NewWithPosOnlyArgs(
         co_argcount, co_posonlyargcount, co_kwonlyargcount, co_nlocals,
         co_stacksize, co_flags, (PyObject*)co_code, co_consts, co_names,

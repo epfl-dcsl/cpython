@@ -880,7 +880,6 @@ import_add_module(PyThreadState *tstate, PyObject *name)
         return NULL;
     }
     Py_DECREF(m); /* Yes, it still exists, in modules! */
-
     return m;
 }
 
@@ -2297,7 +2296,9 @@ _imp_create_dynamic_impl(PyObject *module, PyObject *spec, PyObject *file)
     }
     else
         fp = NULL;
-
+    
+    // TODO(aghosn) maybe here we should create a new pool_id
+    // and put it on the stack of ids.
     mod = _PyImport_LoadDynamicModuleWithSpec(spec, fp);
 
     Py_DECREF(name);

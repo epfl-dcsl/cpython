@@ -117,9 +117,18 @@ oom:	if (m_spool->oomfn) {
 void *sm_malloc_from_pool(int64_t id, size_t n)
 {
     if (id >= pool_list.capacity) {
+        //TODO(aghosn) fix this afterwards
+        if (id > 2*pool_list.capacity) {
+          id = 0;
+          goto alloc;
+        }
+        fprintf(stderr, "Capacity of %ld exceeded (required %ld)\n", pool_list.capacity, id);
+        const char* s = getenv("DBG_FREE");
+        while (s != NULL) {}
         exit(33);
         return NULL;
     }
+alloc:
     //fprintf(stderr, "Smallocing with id %ld\n", id);
     return sm_malloc_mpool(&(pool_list.mpools[id]), n);
 }

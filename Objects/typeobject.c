@@ -1050,7 +1050,6 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
         // (elsa) ADDED THIS
         if (type == &PyModule_Type) {
             PyInterpreterState *interp = _PyInterpreterState_Get();
-            //id = interp->genmd_id++; // TODO make it so that the library gives the ids
 
             if ((id = sm_add_mpool(type->tp_name)) < 0) {
                 fprintf(stderr, "type-object: error while adding a new pool\n");
