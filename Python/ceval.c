@@ -4969,11 +4969,17 @@ PyEval_GetGlobals(void)
     return current_frame->f_globals;
 }
 
+#define MY_IMPL 1
+
 /**
  * Returns the current module id.
  * If it cannot be found, return 0, the default id.
  */
 int64_t PyObject_Get_Current_ModuleId() {
+#ifdef MY_IMPL
+  // Because for the moment there is no guarantee we control the alloc.
+  return 0;
+#else
   _Py_IDENTIFIER(__name__);
   PyObject* globals = PyEval_GetGlobals();
   if (globals == NULL) {
@@ -4996,8 +5002,8 @@ int64_t PyObject_Get_Current_ModuleId() {
     fprintf(stderr, "The module is not allocated by us\n");
     return 0;
   }
-  fprintf(stderr, "WE ALLOCATED THE MODULE YOUHOU\n");
   return id;
+#endif
 }
 
 int

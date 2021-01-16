@@ -74,6 +74,7 @@ int64_t sm_add_mpool(const char* name);
 int sm_release_pools(void);
 
 void *sm_malloc_from_pool(int64_t, size_t);
+void *sm_realloc_from_pool(void* ptr, size_t size);
 void sm_free_from_pool(void *);
 
 

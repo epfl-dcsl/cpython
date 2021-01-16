@@ -120,6 +120,22 @@ void *sm_malloc_from_pool(int64_t id, size_t n)
     return sm_malloc_mpool(&(pool_list.mpools[id]), n, id);
 }
 
+/* (aghosn) reimplemented realloc */
+void *sm_realloc_from_pool(void* ptr, size_t size) {
+  struct smalloc_hdr * shdr = USER_TO_HEADER(ptr);
+  int64_t id = shdr->pool_id;
+  if (id >= pool_list.capacity) {
+    fprintf(stderr, "Capacity of %ld exceeded (required %ld)*\n", pool_list.capacity, id);
+    exit(66);
+  }
+  void* real = sm_malloc_from_pool(id, size);
+  size_t min = (shdr->usz < size)? shdr->usz : size;
+  memcpy(real, ptr, min);
+  sm_free(ptr);
+  ptr = NULL;
+  return real;
+}
+
 int64_t sm_get_object_id(void* p)
 {
     struct smalloc_mpools m_pool;

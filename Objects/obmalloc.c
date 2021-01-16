@@ -14,6 +14,8 @@ extern void _PyMem_DumpTraceback(int fd, const void *ptr);
 #undef  uint
 #define uint    unsigned int    /* assuming >= 16 bits */
 
+#define MY_IMPL 1
+
 /* Forward declaration */
 static void* _PyMem_DebugRawMalloc(void *ctx, size_t size);
 static void* _PyMem_DebugRawCalloc(void *ctx, size_t nelem, size_t elsize);
@@ -116,11 +118,16 @@ _Pool_RawMalloc(void* ctx, size_t size)
 {
   if (size == 0)
       size = 1;
+#ifdef MY_IMPL
+  int64_t id = PyObject_Get_Current_ModuleId();
+  return sm_malloc_from_pool(id, size);
+#else
   size += HEADER_SZ;
   void* res = _PyMem_RawMalloc(ctx, size);
   struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
   shdr->magic = NOT_MY_MAGIC;
   return HEADER_TO_USER(shdr);
+#endif
 }
 
 static void *
@@ -145,11 +152,17 @@ _Pool_RawCalloc(void* ctx, size_t nelem, size_t elsize)
       nelem = 1;
       elsize = 1;
   }
+#ifdef MY_IMPL
+  size_t size = nelem * elsize;
+  int64_t id = PyObject_Get_Current_ModuleId();
+  return sm_malloc_from_pool(id, size);
+#else
   size_t size = nelem * elsize + HEADER_SZ;
   void* res = _PyMem_RawMalloc(ctx, size);
   struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
   shdr->magic = NOT_MY_MAGIC;
   return HEADER_TO_USER(shdr);
+#endif
 }
 
 static void *
@@ -166,6 +179,13 @@ _Pool_RawRealloc(void* ctx, void *ptr, size_t size)
 {
   if (size == 0)
       size = 1;
+#ifdef MY_IMPL
+  if (ptr == NULL) {
+    int64_t id = PyObject_Get_Current_ModuleId();
+    return sm_malloc_from_pool(id, size);
+  }
+  return sm_realloc_from_pool(ptr, size);
+#else
   size += HEADER_SZ;
   if (ptr != NULL) {
     ptr = (void*) USER_TO_HEADER(ptr);
@@ -174,6 +194,7 @@ _Pool_RawRealloc(void* ctx, void *ptr, size_t size)
   struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
   shdr->magic = NOT_MY_MAGIC;
   return HEADER_TO_USER(shdr);
+#endif
 }
 
 static void
@@ -186,6 +207,12 @@ _PyMem_RawFree(void *ctx, void *ptr)
 static void 
 _Pool_RawFree(void* ctx, void *ptr)
 {
+#ifdef MY_IMPL
+  if (ptr == NULL) {
+    return;
+  }
+  sm_free_from_pool(ptr);
+#else
   if (ptr == NULL) {
     free(ptr);
     return;
@@ -196,6 +223,7 @@ _Pool_RawFree(void* ctx, void *ptr)
     exit(33);
   }
   _PyMem_RawFree(ctx, (void*)(shdr));
+#endif
 }
 
 

@@ -185,7 +185,7 @@ int sm_release_pools(void)
 struct smalloc_pool *sm_add_pool(struct smalloc_mpools *m_spool, size_t n) // default oom handler
 {
     if (n > m_spool->pools_size) {
-        fprintf(stderr, "add-pool: too big chunk of memory requested\n");
+        fprintf(stderr, "add-pool: too big chunk of memory requested %ld\n", n);
         return NULL;
     }
     if (m_spool->next >= m_spool->capacity) {
