@@ -4,19 +4,14 @@
  * Copyright (c) 2017 Andrey Rys.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include "smalloc_i.h"
 
-void *sm_malloc_mpool(struct smalloc_mpools *m_spool, size_t n, int64_t id)
+void *sm_malloc_pool(int64_t id, struct smalloc_pool *spool, size_t n)
 {
-  struct smalloc_pool *spool;
 	struct smalloc_hdr *basehdr, *shdr, *dhdr;
 	char *s;
 	int found;
 	size_t x;
-
-  spool = &(m_spool->pools[m_spool->next-1]);
 
 again:	if (!smalloc_verify_pool(spool)) {
 		errno = EINVAL;
@@ -27,7 +22,7 @@ again:	if (!smalloc_verify_pool(spool)) {
 	if (n > SIZE_MAX
 	|| n > (spool->pool_size - HEADER_SZ)) goto oom;
 
-	shdr = basehdr = spool->pool;
+	shdr = basehdr = (struct smalloc_hdr *)spool->pool;
 	while (CHAR_PTR(shdr)-CHAR_PTR(basehdr) < spool->pool_size) {
 		/*
 		 * Already allocated block.
@@ -71,7 +66,7 @@ again:	if (!smalloc_verify_pool(spool)) {
 outfound:		if (found) {
 				uintptr_t tag;
 				/* allocate and return this block */
-        shdr->magic = MY_MAGIC;
+        shdr->sm_magic = SM_MAGIC; 
         shdr->pool_id = id;
 				shdr->rsz = x;
 				shdr->usz = n;
@@ -86,7 +81,6 @@ outfound:		if (found) {
 					memcpy(s+x, &tag, sizeof(uintptr_t));
 				}
 				memset(s+x, 0xff, shdr->rsz - shdr->usz);
-                spool->num_elems++; // (elsa) ADDED THIS
 				return HEADER_TO_USER(shdr);
 			}
 
@@ -98,10 +92,10 @@ allocblock:		shdr = dhdr;
 		shdr++;
 	}
 
-oom:	if (m_spool->oomfn) {
-		spool = m_spool->oomfn(m_spool, n);
-		if (spool != NULL) {
-			m_spool->next++;
+oom:	if (spool->oomfn) {
+		x = spool->oomfn(spool, n);
+		if (x > spool->pool_size) {
+			spool->pool_size = x;
 			if (sm_align_pool(spool)) goto again;
 		}
 	}
@@ -110,59 +104,7 @@ oom:	if (m_spool->oomfn) {
 	return NULL;
 }
 
-/* (elsa) ADDED THIS */
-void *sm_malloc_from_pool(int64_t id, size_t n)
+void *sm_malloc(size_t n)
 {
-    if (id >= pool_list.capacity) {
-        fprintf(stderr, "Capacity of %ld exceeded (required %ld)\n", pool_list.capacity, id);
-        exit(33);
-    }
-    return sm_malloc_mpool(&(pool_list.mpools[id]), n, id);
+	return sm_malloc_pool(0, &smalloc_curr_pool, n);
 }
-
-/* (aghosn) reimplemented realloc */
-void *sm_realloc_from_pool(void* ptr, size_t size) {
-  struct smalloc_hdr * shdr = USER_TO_HEADER(ptr);
-  int64_t id = shdr->pool_id;
-  if (id >= pool_list.capacity) {
-    fprintf(stderr, "Capacity of %ld exceeded (required %ld)*\n", pool_list.capacity, id);
-    exit(66);
-  }
-  void* real = sm_malloc_from_pool(id, size);
-  size_t min = (shdr->usz < size)? shdr->usz : size;
-  memcpy(real, ptr, min);
-  sm_free(ptr);
-  ptr = NULL;
-  return real;
-}
-
-int64_t sm_get_object_id(void* p)
-{
-    struct smalloc_mpools m_pool;
-    struct smalloc_hdr *shdr = USER_TO_HEADER(p);
-    int64_t id = shdr->pool_id;
-    if (id >= pool_list.capacity || id < 0) {
-      return -1;
-    }
-
-    if (shdr->magic != MY_MAGIC) {
-      return -1;
-    }
-
-    m_pool = pool_list.mpools[id];
-    // Linear search
-    for (size_t i = 0; i < m_pool.next; ++i) {
-        struct smalloc_pool *spool = &(m_pool.pools[i]);
-        if (p >= spool->pool && p < spool->pool + m_pool.pools_size) {
-            if (!smalloc_is_alloc(spool, shdr)) {
-              return -1; 
-            }
-            return id;
-        }
-    }
-    //TODO(aghosn) we have issues here
-    fprintf(stderr, "Failure after the loop %ld, %d\n", id, shdr->magic == MY_MAGIC);
-    exit(666); 
-    return -2;
-}
-

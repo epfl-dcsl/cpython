@@ -12,18 +12,16 @@
 #include <limits.h>
 #include <errno.h>
 
-#define MY_MAGIC 0xdeadbeef
-#define NOT_MY_MAGIC 0xdeadbabe
-
-//TODO(aghosn) modify this to encode the id.
 struct smalloc_hdr {
-  int32_t magic; /* adding a magic number just to check */
-  int64_t pool_id; /* encodes the pool id for the object */
-	size_t rsz; /* real allocated size with overhead (if any) */
-	size_t usz; /* exact user size as reported by s_szalloc */
-	uintptr_t tag; /* sum of all the above, hashed value */
+  uint32_t sm_magic;  /* a magic number */
+  int64_t pool_id;    /* the pool id of the object */
+	size_t rsz;         /* real allocated size with overhead (if any) */
+	size_t usz;         /* exact user size as reported by s_szalloc */
+	uintptr_t tag;      /* sum of all the above, hashed value */
 };
 
+#define SM_MAGIC ((uint32_t) 0xdeadbeef) 
+#define SM_NOT_MAGIC ((uint32) 0xdeadbabe)
 #define HEADER_SZ (sizeof(struct smalloc_hdr))
 #define MIN_POOL_SZ (HEADER_SZ*20)
 
@@ -40,6 +38,7 @@ uintptr_t smalloc_uinthash(uintptr_t x);
 uintptr_t smalloc_mktag(struct smalloc_hdr *shdr);
 int smalloc_verify_pool(struct smalloc_pool *spool);
 int smalloc_is_alloc(struct smalloc_pool *spool, struct smalloc_hdr *shdr);
+int smalloc_check_magic(struct smalloc_hdr* shdr);
 
 void *sm_realloc_pool_i(struct smalloc_pool *spool, void *p, size_t n, int nomove);
 

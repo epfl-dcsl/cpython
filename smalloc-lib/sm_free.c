@@ -5,8 +5,6 @@
  */
 
 #include "smalloc_i.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 void sm_free_pool(struct smalloc_pool *spool, void *p)
 {
@@ -39,46 +37,3 @@ void sm_free(void *p)
 {
 	sm_free_pool(&smalloc_curr_pool, p);
 }
-
-
-/* (elsa) ADDED THIS */
-void sm_free_from_pool(void *p)
-{
-    struct smalloc_mpools m_pool;
-    struct smalloc_hdr *shdr = USER_TO_HEADER(p);
-    int64_t id = shdr->pool_id;
-    if (id >= pool_list.capacity || id < 0) {
-      goto error_free;
-    }
-
-    m_pool = pool_list.mpools[id];
-    // Linear search
-    for (size_t i = 0; i < m_pool.next; ++i) {
-        struct smalloc_pool *spool = &(m_pool.pools[i]);
-        if (p >= spool->pool && p < spool->pool + m_pool.pools_size) {
-            if (!smalloc_is_alloc(spool, shdr)) {
-              goto error_free; 
-            }
-            sm_free_pool(spool, p);
-            if (--spool->num_elems <= 0 && m_pool.next == 1) { // Only one page to simplify
-                if (pool_list.free_ids.sp >= 9) { // remove magic number
-                    //fprintf(stderr, "too many freed modules; can't keep up\n");
-                    // This must be the end of the program, everything will be freed anyway
-                    return;
-                }
-                pool_list.free_ids.stack[pool_list.free_ids.sp++] = id;
-            }
-
-            return;
-        }
-    }
-    // That's unexpected.
-    fprintf(stderr, "smalloc-free: No corresponding pool was found!! %ld -- %p \n", id, p);
-    return;
-
-error_free:
-  fprintf(stderr, "smalloc-free: Received invalid id %ld\n", id);
-  exit(666); 
-  return;
-}
-
