@@ -20,8 +20,10 @@ main(int argc, char **argv)
     SB_Initialize();
     register_region = &SB_RegisterRegion; 
     register_growth = &SB_RegisterGrowth;
-    if (!sm_pools_init(100, 10, sysconf(_SC_PAGESIZE))) // TODO have default values somewhere ?
+    if (!sm_pools_init(100, 10, sysconf(_SC_PAGESIZE))) {
+        fprintf(stderr, "Error initializing the memory pools\n");
         return 1;
+    }
 
     ret = Py_BytesMain(argc, argv);
 

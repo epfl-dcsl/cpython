@@ -42,17 +42,23 @@ void sm_free(void *p)
 
 
 /* (elsa) ADDED THIS */
-void sm_free_from_pool(int64_t id, void *p)
+void sm_free_from_pool(void *p)
 {
+    struct smalloc_mpools m_pool;
+    struct smalloc_hdr *shdr = USER_TO_HEADER(p);
+    int64_t id = shdr->pool_id;
     if (id >= pool_list.capacity || id < 0) {
-        fprintf(stderr, "smalloc-free: Received invalid id\n");
-        return;
+      goto error_free;
     }
-    struct smalloc_mpools m_pool = pool_list.mpools[id];
+
+    m_pool = pool_list.mpools[id];
     // Linear search
     for (size_t i = 0; i < m_pool.next; ++i) {
         struct smalloc_pool *spool = &(m_pool.pools[i]);
         if (p >= spool->pool && p < spool->pool + m_pool.pools_size) {
+            if (!smalloc_is_alloc(spool, shdr)) {
+              goto error_free; 
+            }
             sm_free_pool(spool, p);
             if (--spool->num_elems <= 0 && m_pool.next == 1) { // Only one page to simplify
                 if (pool_list.free_ids.sp >= 9) { // remove magic number
@@ -66,8 +72,13 @@ void sm_free_from_pool(int64_t id, void *p)
             return;
         }
     }
+    // That's unexpected.
     fprintf(stderr, "smalloc-free: No corresponding pool was found!! %ld -- %p \n", id, p);
-    //const char* s = getenv("DBG_FREE");
-    //while (s != NULL) {}
+    return;
+
+error_free:
+  fprintf(stderr, "smalloc-free: Received invalid id %ld\n", id);
+  exit(666); 
+  return;
 }
 

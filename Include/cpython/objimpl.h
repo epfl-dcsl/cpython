@@ -131,7 +131,7 @@ PyAPI_FUNC(int) PyObject_IS_GC(PyObject *obj);
 #  define _PyGC_FINALIZED(o) PyObject_GC_IsFinalized(o)
 #endif
 
-PyAPI_FUNC(PyObject *) _PyObject_GC_Malloc(size_t size, int64_t pool_id); // (elsa) ADDED arg
+PyAPI_FUNC(PyObject *) _PyObject_GC_Malloc(size_t size);
 PyAPI_FUNC(PyObject *) _PyObject_GC_Calloc(size_t size);
 
 

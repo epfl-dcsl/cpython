@@ -62,8 +62,6 @@ struct PyCodeObject {
     _PyOpcache *co_opcache;
     int co_opcache_flag;  // used to determine when create a cache.
     unsigned char co_opcache_size;  // length of co_opcache.
-
-    int64_t pool_id; // (elsa) ADDED THIS
 };
 
 /* Masks for co_flags above */
@@ -124,7 +122,7 @@ PyAPI_FUNC(PyCodeObject *) PyCode_New(
 
 PyAPI_FUNC(PyCodeObject *) PyCode_NewWithPosOnlyArgs(
         int, int, int, int, int, int, PyObject *, PyObject *,
-        PyObject *, PyObject *, PyObject *, PyObject *, PyObject *,
+        PyObject *, PyObject *, PyObject *, PyObject *, /*PyObject *,*/
         PyObject *, PyObject *, int, PyObject *);
         /* same as struct above */
 

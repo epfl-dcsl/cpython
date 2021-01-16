@@ -12,7 +12,13 @@
 #include <limits.h>
 #include <errno.h>
 
+#define MY_MAGIC 0xdeadbeef
+#define NOT_MY_MAGIC 0xdeadbabe
+
+//TODO(aghosn) modify this to encode the id.
 struct smalloc_hdr {
+  int32_t magic; /* adding a magic number just to check */
+  int64_t pool_id; /* encodes the pool id for the object */
 	size_t rsz; /* real allocated size with overhead (if any) */
 	size_t usz; /* exact user size as reported by s_szalloc */
 	uintptr_t tag; /* sum of all the above, hashed value */

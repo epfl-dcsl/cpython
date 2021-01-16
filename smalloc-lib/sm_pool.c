@@ -115,6 +115,11 @@ int sm_pools_init(size_t outer_capacity, size_t inner_capacity, size_t pools_siz
     pool_list.mpools = mpools;
     pool_list.capacity = outer_capacity;
 
+    //TODO(aghosn) Create the default pool with id 0
+    int64_t id = sm_add_mpool("default");
+    if (id != 0) {
+      return -1;
+    }
     return 1;
 }
 

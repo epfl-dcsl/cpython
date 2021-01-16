@@ -561,7 +561,8 @@ compiler_unit_free(struct compiler_unit *u)
     }
     Py_CLEAR(u->u_ste);
     Py_CLEAR(u->u_name);
-    Py_CLEAR(u->u_qualname);
+    //TODO(aghosn) this apparently tries to decrement a RO address.
+    //Py_CLEAR(u->u_qualname);
     Py_CLEAR(u->u_consts);
     Py_CLEAR(u->u_names);
     Py_CLEAR(u->u_varnames);
@@ -6058,7 +6059,7 @@ makecode(struct compiler *c, struct assembler *a)
     co = PyCode_NewWithPosOnlyArgs(posonlyargcount+posorkeywordargcount,
                                    posonlyargcount, kwonlyargcount, nlocals_int,
                                    maxdepth, flags, bytecode, consts, names,
-                                   varnames, freevars, cellvars, sandboxes, c->c_filename,
+                                   varnames, freevars, cellvars, /*sandboxes,*/ c->c_filename,
                                    c->u->u_name, c->u->u_firstlineno, a->a_lnotab);
  error:
     Py_XDECREF(consts);

@@ -118,7 +118,7 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
                           int nlocals, int stacksize, int flags,
                           PyObject *code, PyObject *consts, PyObject *names,
                           PyObject *varnames, PyObject *freevars, PyObject *cellvars,
-                          PyObject *sandboxes, PyObject *filename, PyObject *name, int firstlineno,
+                          /*PyObject *sandboxes,*/ PyObject *filename, PyObject *name, int firstlineno,
                           PyObject *lnotab)
 {
     PyCodeObject *co;
@@ -135,7 +135,7 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
         varnames == NULL || !PyTuple_Check(varnames) ||
         freevars == NULL || !PyTuple_Check(freevars) ||
         cellvars == NULL || !PyTuple_Check(cellvars) ||
-        sandboxes == NULL || !PyDict_Check(sandboxes) || // TODO a reason why they are all tuples ??
+        //sandboxes == NULL || !PyDict_Check(sandboxes) || 
         name == NULL || !PyUnicode_Check(name) ||
         filename == NULL || !PyUnicode_Check(filename) ||
         lnotab == NULL || !PyBytes_Check(lnotab)) {
@@ -221,16 +221,16 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
             cell2arg = NULL;
         }
     }
-    // (elsa) ADDED THIS (test)
-    PyInterpreterState *interp = _PyInterpreterState_Get();
-    int64_t pool_id = interp->md_ids.stack[interp->md_ids.sp-1];
-    co = PyObject_NEWFromPool(PyCodeObject, &PyCode_Type, pool_id);
+    // (elsa) ADDED THIS (test) ->TODO(aghosn) do a malloc with new id instead.
+    //PyInterpreterState *interp = _PyInterpreterState_Get();
+    //int64_t pool_id = interp->md_ids.stack[interp->md_ids.sp-1];
+    //co = PyObject_NEWFromPool(PyCodeObject, &PyCode_Type, pool_id);
+    co = PyObject_New(PyCodeObject, &PyCode_Type);
     if (co == NULL) {
         if (cell2arg)
             PyMem_FREE(cell2arg);
         return NULL;
     }
-    co->pool_id = pool_id;
     co->co_argcount = argcount;
     co->co_posonlyargcount = posonlyargcount;
     co->co_kwonlyargcount = kwonlyargcount;
@@ -250,8 +250,8 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
     Py_INCREF(cellvars);
     co->co_cellvars = cellvars;
     co->co_cell2arg = cell2arg;
-    Py_INCREF(sandboxes);
-    co->co_sandboxes = sandboxes;
+    //Py_INCREF(sandboxes);
+    co->co_sandboxes = PyDict_New();
     Py_INCREF(filename);
     co->co_filename = filename;
     Py_INCREF(name);
@@ -280,7 +280,7 @@ PyCode_New(int argcount, int kwonlyargcount,
 {
     return PyCode_NewWithPosOnlyArgs(argcount, 0, kwonlyargcount, nlocals,
                                      stacksize, flags, code, consts, names,
-                                     varnames, freevars, cellvars, /*sandboxes*/ PyDict_New(), filename,
+                                     varnames, freevars, cellvars, /* PyDict_New(),*/ filename,
                                      name, firstlineno, lnotab);
 }
 
@@ -364,7 +364,7 @@ PyCode_NewEmpty(const char *filename, const char *funcname, int firstlineno)
                 nulltuple,                      /* varnames */
                 nulltuple,                      /* freevars */
                 nulltuple,                      /* cellvars */
-                PyDict_New(),                   /* sandboxes */
+                //PyDict_New(),                   /* sandboxes */
                 filename_ob,                    /* filename */
                 funcname_ob,                    /* name */
                 firstlineno,                    /* firstlineno */
@@ -541,7 +541,7 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
                                                nlocals, stacksize, flags,
                                                code, consts, ournames,
                                                ourvarnames, ourfreevars,
-                                               ourcellvars, sandboxes, filename,
+                                               ourcellvars, /*sandboxes,*/ filename,
                                                name, firstlineno, lnotab);
   cleanup:
     Py_XDECREF(ournames);
@@ -593,8 +593,7 @@ code_dealloc(PyCodeObject *co)
         PyObject_GC_Del(co->co_zombieframe);
     if (co->co_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject*)co);
-    //PyObject_DEL(co);
-    PyObject_FreeFromPool(co, co->pool_id); // (elsa) CHANGED THIS
+    PyObject_DEL(co);
 }
 
 static PyObject *
@@ -681,7 +680,7 @@ code_replace_impl(PyCodeObject *self, int co_argcount,
     return (PyObject *)PyCode_NewWithPosOnlyArgs(
         co_argcount, co_posonlyargcount, co_kwonlyargcount, co_nlocals,
         co_stacksize, co_flags, (PyObject*)co_code, co_consts, co_names,
-        co_varnames, co_freevars, co_cellvars, PyDict_New(), co_filename, co_name,
+        co_varnames, co_freevars, co_cellvars, /*PyDict_New(),*/ co_filename, co_name,
         co_firstlineno, (PyObject*)co_lnotab);
 }
 

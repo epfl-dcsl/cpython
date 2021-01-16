@@ -95,11 +95,6 @@ struct _is {
     PyObject *importlib;
     PyObject *dependencies;
 
-    struct {
-        int64_t stack[200]; // TODO which value ?? make it not magic
-        size_t sp;
-    } md_ids;
-
     /* Used in Modules/_threadmodule.c. */
     long num_threads;
     /* Support for runtime thread stack size tuning.

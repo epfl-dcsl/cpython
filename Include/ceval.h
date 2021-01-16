@@ -36,6 +36,9 @@ PyAPI_FUNC(PyFrameObject *) PyEval_GetFrame(void);
 PyAPI_FUNC(int) Py_AddPendingCall(int (*func)(void *), void *arg);
 PyAPI_FUNC(int) Py_MakePendingCalls(void);
 
+// aghosn added this.
+int64_t PyObject_Get_Current_ModuleId();
+
 /* Protection against deeply nested recursive calls
 
    In Python 3.0, this protection has two levels:

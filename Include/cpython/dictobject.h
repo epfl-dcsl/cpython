@@ -29,8 +29,6 @@ typedef struct {
        If ma_values is not NULL, the table is splitted:
        keys are stored in ma_keys and values are stored in ma_values */
     PyObject **ma_values;
-
-    int64_t pool_id; // (elsa) ADDED THIS: memory pool id
 } PyDictObject;
 
 PyAPI_FUNC(PyObject *) _PyDict_GetItem_KnownHash(PyObject *mp, PyObject *key,

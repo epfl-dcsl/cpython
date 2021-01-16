@@ -89,12 +89,14 @@ PyModule_NewObject(PyObject *name)
 {
     PyModuleObject *m;
     // (elsa) ADDED THIS
-    int64_t id;
-    if ((id = sm_add_mpool(PyUnicode_AsUTF8(name))) < 0) {
+    int64_t id = sm_add_mpool(PyUnicode_AsUTF8(name));
+    if (id < 0) {
         fprintf(stderr, "module-object: error while adding a new pool\n");
+        exit(33);
     }
-    //m = PyObject_GC_New(PyModuleObject, &PyModule_Type);
-    m = PyObject_GC_NewFromPool(PyModuleObject, &PyModule_Type, id);
+    SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
+    m = PyObject_GC_New(PyModuleObject, &PyModule_Type);
+    //m = PyObject_GC_NewFromPool(PyModuleObject, &PyModule_Type, id);
 
     if (m == NULL)
         return NULL;
@@ -102,8 +104,8 @@ PyModule_NewObject(PyObject *name)
     m->md_state = NULL;
     m->md_weaklist = NULL;
     m->md_name = NULL;
-    m->md_dict = PyDict_NewFromPool(id);
-    m->md_id = id; // ADDED THIS
+    m->md_dict = PyDict_New();
+    m->md_id = id; // ADDED THIS (aghosn) remove this
     assert(name != NULL && PyUnicode_Check(name));
     //(aghosn) Registration done here allows to keep names as well.
     SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
@@ -672,22 +674,16 @@ static int
 module___init___impl(PyModuleObject *self, PyObject *name, PyObject *doc)
 /*[clinic end generated code: output=e7e721c26ce7aad7 input=57f9e177401e5e1e]*/
 {
-    // (elsa) ADDED THIS
-    PyInterpreterState *interp = _PyInterpreterState_Get();
-    if (interp->md_ids.sp >= 200) {
-        fprintf(stderr, "MODULE IDS STACK OVERFLOW!!\n");
-        return -1;
+    int64_t id = sm_add_mpool(PyUnicode_AsUTF8(name));
+    if (id < 0) {
+      fprintf(stderr, "Could not register the module :(\n");
+      exit(33);
     }
-    int64_t id = interp->md_ids.stack[interp->md_ids.sp++];
-    self->md_id = id;
-    //(aghosn) Registering the package id.
-    if (name != NULL && PyUnicode_Check(name)) {
-      SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
-    }
+    SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
 
     PyObject *dict = self->md_dict;
     if (dict == NULL) {
-        dict = PyDict_NewFromPool(id);
+        dict = PyDict_New();
         if (dict == NULL)
             return -1;
         self->md_dict = dict;
@@ -719,8 +715,7 @@ module_dealloc(PyModuleObject *m)
     Py_XDECREF(m->md_name);
     if (m->md_state != NULL)
         PyMem_FREE(m->md_state);
-    //Py_TYPE(m)->tp_free((PyObject *)m);
-    PyObject_GC_DelFromPool((PyObject *)m, m->md_id);
+    Py_TYPE(m)->tp_free((PyObject *)m);
 }
 
 static PyObject *

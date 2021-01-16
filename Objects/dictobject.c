@@ -117,6 +117,8 @@ converting the dict to the combined table.
 #include "dict-common.h"
 #include "stringlib/eq.h"    // unicode_eq()
 
+#include "smalloc.h"
+
 /*[clinic input]
 class dict "PyDictObject *" "&PyDict_Type"
 [clinic start generated code]*/
@@ -611,12 +613,13 @@ free_keys_object(PyDictKeysObject *keys)
 
 /* Consumes a reference to the keys object */
 static PyObject *
-new_dict(PyDictKeysObject *keys, PyObject **values, int64_t pool_id) // (elsa) ADDED arg
+new_dict(PyDictKeysObject *keys, PyObject **values)
 {
     PyDictObject *mp;
     assert(keys != NULL);
+
 #if PyDict_MAXFREELIST > 0
-    if (numfree && pool_id < 0) {
+    if (numfree) {
         mp = free_list[--numfree];
         assert (mp != NULL);
         assert (Py_IS_TYPE(mp, &PyDict_Type));
@@ -625,7 +628,7 @@ new_dict(PyDictKeysObject *keys, PyObject **values, int64_t pool_id) // (elsa) A
     else
 #endif
     {
-        mp = PyObject_GC_NewFromPool(PyDictObject, &PyDict_Type, pool_id);
+        mp = PyObject_GC_New(PyDictObject, &PyDict_Type);
         if (mp == NULL) {
             dictkeys_decref(keys);
             if (values != empty_values) {
@@ -639,7 +642,6 @@ new_dict(PyDictKeysObject *keys, PyObject **values, int64_t pool_id) // (elsa) A
     mp->ma_used = 0;
     mp->ma_version_tag = DICT_NEXT_VERSION();
     ASSERT_CONSISTENT(mp);
-    mp->pool_id = pool_id; // (elsa) ADDED THIS
     return (PyObject *)mp;
 }
 
@@ -659,7 +661,7 @@ new_dict_with_shared_keys(PyDictKeysObject *keys)
     for (i = 0; i < size; i++) {
         values[i] = NULL;
     }
-    return new_dict(keys, values, -1); // (elsa) ADDED arg
+    return new_dict(keys, values);
 }
 
 
@@ -693,7 +695,7 @@ clone_combined_dict(PyDictObject *orig)
         }
     }
 
-    PyDictObject *new = (PyDictObject *)new_dict(keys, NULL, -1); // (elsa) ADDED arg
+    PyDictObject *new = (PyDictObject *)new_dict(keys, NULL);
     if (new == NULL) {
         /* In case of an error, `new_dict()` takes care of
            cleaning up `keys`. */
@@ -721,17 +723,8 @@ PyObject *
 PyDict_New(void)
 {
     dictkeys_incref(Py_EMPTY_KEYS);
-    return new_dict(Py_EMPTY_KEYS, empty_values, -1); // (elsa) ADDED arg
+    return new_dict(Py_EMPTY_KEYS, empty_values);
 }
-
-/* (elsa) ADDED THIS */
-PyObject *
-PyDict_NewFromPool(int64_t pool_id)
-{
-    dictkeys_incref(Py_EMPTY_KEYS);
-    return new_dict(Py_EMPTY_KEYS, empty_values, pool_id);
-}
-/* ----------------- */
 
 /* Search index of hash table from offset of entry table */
 static Py_ssize_t
@@ -1375,7 +1368,7 @@ _PyDict_NewPresized(Py_ssize_t minused)
     new_keys = new_keys_object(newsize);
     if (new_keys == NULL)
         return NULL;
-    return new_dict(new_keys, NULL, -1);
+    return new_dict(new_keys, NULL);
 }
 
 /* Note that, for historical reasons, PyDict_GetItem() suppresses all errors
@@ -2036,17 +2029,13 @@ dict_dealloc(PyDictObject *mp)
         dictkeys_decref(keys);
     }
 #if PyDict_MAXFREELIST > 0
-    if (numfree < PyDict_MAXFREELIST && Py_IS_TYPE(mp, &PyDict_Type) && mp->pool_id < 0) {
+    if (numfree < PyDict_MAXFREELIST && Py_IS_TYPE(mp, &PyDict_Type)) {
         free_list[numfree++] = mp;
     }
     else
 #endif
     {
-      if (mp->pool_id < 0) {
-        Py_TYPE(mp)->tp_free((PyObject *)mp);
-      } else {
-        PyObject_GC_DelFromPool((PyObject *)mp, mp->pool_id);
-      }
+      Py_TYPE(mp)->tp_free((PyObject *)mp);
     }
     Py_TRASHCAN_END
 }
@@ -3370,7 +3359,7 @@ dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         Py_DECREF(self);
         return NULL;
     }
-    d->pool_id = -1; // (elsa) ADDED THIS
+    //d->pool_id = -1; // (elsa) ADDED THIS
     ASSERT_CONSISTENT(d);
     return self;
 }

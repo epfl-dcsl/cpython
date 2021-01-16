@@ -32,6 +32,7 @@
 
 #include <ctype.h>
 
+#include "smalloc.h"
 #include "liblitterbox.h"
 
 #ifdef Py_DEBUG
@@ -4966,6 +4967,37 @@ PyEval_GetGlobals(void)
 
     assert(current_frame->f_globals != NULL);
     return current_frame->f_globals;
+}
+
+/**
+ * Returns the current module id.
+ * If it cannot be found, return 0, the default id.
+ */
+int64_t PyObject_Get_Current_ModuleId() {
+  _Py_IDENTIFIER(__name__);
+  PyObject* globals = PyEval_GetGlobals();
+  if (globals == NULL) {
+    return 0;
+  }
+  PyObject* name = _PyDict_GetItemIdWithError(globals, &PyId___name__);
+  if (name == NULL) {
+    return 0;
+  }
+  PyObject* myMod = PyImport_GetModule(name);
+  if (myMod == NULL) {
+    return 0;
+  }
+  if (!PyModule_Check(myMod)) {
+    fprintf(stderr, "We got a module that is not a module!\n");
+    exit(33);
+  }
+  int64_t id = sm_get_object_id(myMod);
+  if (id < 0 ) {
+    fprintf(stderr, "The module is not allocated by us\n");
+    return 0;
+  }
+  fprintf(stderr, "WE ALLOCATED THE MODULE YOUHOU\n");
+  return id;
 }
 
 int

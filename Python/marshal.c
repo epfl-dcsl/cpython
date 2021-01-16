@@ -1385,7 +1385,7 @@ r_object(RFILE *p)
                             argcount, posonlyargcount, kwonlyargcount,
                             nlocals, stacksize, flags,
                             code, consts, names, varnames,
-                            freevars, cellvars, sandboxes, filename, name,
+                            freevars, cellvars, /*sandboxes,*/ filename, name,
                             firstlineno, lnotab);
             v = r_ref_insert(v, idx, flag, p);
 

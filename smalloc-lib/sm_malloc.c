@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include "smalloc_i.h"
 
-void *sm_malloc_mpool(struct smalloc_mpools *m_spool, size_t n)
+void *sm_malloc_mpool(struct smalloc_mpools *m_spool, size_t n, int64_t id)
 {
   struct smalloc_pool *spool;
 	struct smalloc_hdr *basehdr, *shdr, *dhdr;
@@ -71,6 +71,8 @@ again:	if (!smalloc_verify_pool(spool)) {
 outfound:		if (found) {
 				uintptr_t tag;
 				/* allocate and return this block */
+        shdr->magic = MY_MAGIC;
+        shdr->pool_id = id;
 				shdr->rsz = x;
 				shdr->usz = n;
 				shdr->tag = tag = smalloc_mktag(shdr);
@@ -108,28 +110,43 @@ oom:	if (m_spool->oomfn) {
 	return NULL;
 }
 
-/*void *sm_malloc(size_t n)
-{
-	return sm_malloc_pool(&smalloc_curr_pool, n);
-}*/
-
 /* (elsa) ADDED THIS */
 void *sm_malloc_from_pool(int64_t id, size_t n)
 {
     if (id >= pool_list.capacity) {
-        //TODO(aghosn) fix this afterwards
-        if (id > 2*pool_list.capacity) {
-          id = 0;
-          goto alloc;
-        }
         fprintf(stderr, "Capacity of %ld exceeded (required %ld)\n", pool_list.capacity, id);
-        const char* s = getenv("DBG_FREE");
-        while (s != NULL) {}
         exit(33);
-        return NULL;
     }
-alloc:
-    //fprintf(stderr, "Smallocing with id %ld\n", id);
-    return sm_malloc_mpool(&(pool_list.mpools[id]), n);
+    return sm_malloc_mpool(&(pool_list.mpools[id]), n, id);
+}
+
+int64_t sm_get_object_id(void* p)
+{
+    struct smalloc_mpools m_pool;
+    struct smalloc_hdr *shdr = USER_TO_HEADER(p);
+    int64_t id = shdr->pool_id;
+    if (id >= pool_list.capacity || id < 0) {
+      return -1;
+    }
+
+    if (shdr->magic != MY_MAGIC) {
+      return -1;
+    }
+
+    m_pool = pool_list.mpools[id];
+    // Linear search
+    for (size_t i = 0; i < m_pool.next; ++i) {
+        struct smalloc_pool *spool = &(m_pool.pools[i]);
+        if (p >= spool->pool && p < spool->pool + m_pool.pools_size) {
+            if (!smalloc_is_alloc(spool, shdr)) {
+              return -1; 
+            }
+            return id;
+        }
+    }
+    //TODO(aghosn) we have issues here
+    fprintf(stderr, "Failure after the loop %ld, %d\n", id, shdr->magic == MY_MAGIC);
+    exit(666); 
+    return -2;
 }
 

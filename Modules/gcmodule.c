@@ -33,6 +33,8 @@
 #include "pydtrace.h"
 #include "pytime.h"             // _PyTime_GetMonotonicClock()
 
+#include "smalloc.h"
+
 typedef struct _gc_runtime_state GCState;
 
 /*[clinic input]
@@ -2208,7 +2210,7 @@ PyObject_IS_GC(PyObject *obj)
 }
 
 static PyObject *
-_PyObject_GC_Alloc(int use_calloc, size_t basicsize, int64_t pool_id)
+_PyObject_GC_Alloc(int use_calloc, size_t basicsize)
 {
     PyThreadState *tstate = _PyThreadState_GET();
     GCState *gcstate = &tstate->interp->gc;
@@ -2222,12 +2224,7 @@ _PyObject_GC_Alloc(int use_calloc, size_t basicsize, int64_t pool_id)
         g = (PyGC_Head *)PyObject_Calloc(1, size);
     }
     else {
-        if (pool_id >= 0) {
-            g = (PyGC_Head *)PyObject_MallocFromPool(size, pool_id);
-        }
-        else {
-            g = (PyGC_Head *)PyObject_Malloc(size);
-        }
+        g = (PyGC_Head *)PyObject_Malloc(size);
     }
     if (g == NULL) {
         return _PyErr_NoMemory(tstate);
@@ -2252,21 +2249,21 @@ _PyObject_GC_Alloc(int use_calloc, size_t basicsize, int64_t pool_id)
 }
 
 PyObject *
-_PyObject_GC_Malloc(size_t basicsize, int64_t pool_id)
+_PyObject_GC_Malloc(size_t basicsize)
 {
-    return _PyObject_GC_Alloc(0, basicsize, pool_id);
+    return _PyObject_GC_Alloc(0, basicsize);
 }
 
 PyObject *
 _PyObject_GC_Calloc(size_t basicsize)
 {
-    return _PyObject_GC_Alloc(1, basicsize, -1); // (elsa) ADDED default arg
+    return _PyObject_GC_Alloc(1, basicsize);
 }
 
 PyObject *
-_PyObject_GC_New(PyTypeObject *tp, int64_t pool_id)
+_PyObject_GC_New(PyTypeObject *tp)
 {
-    PyObject *op = _PyObject_GC_Malloc(_PyObject_SIZE(tp), pool_id);
+    PyObject *op = _PyObject_GC_Malloc(_PyObject_SIZE(tp));
     if (op != NULL)
         op = PyObject_INIT(op, tp);
     return op;
@@ -2283,7 +2280,7 @@ _PyObject_GC_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
         return NULL;
     }
     size = _PyObject_VAR_SIZE(tp, nitems);
-    op = (PyVarObject *) _PyObject_GC_Malloc(size, -1); // (elsa) ADDED default arg 
+    op = (PyVarObject *) _PyObject_GC_Malloc(size);
     if (op != NULL)
         op = PyObject_INIT_VAR(op, tp, nitems);
     return op;
@@ -2338,22 +2335,4 @@ PyObject_GC_IsFinalized(PyObject *obj)
          return 1;
     }
     return 0;
-}
-
-/* (elsa) ADDED THIS */
-void
-PyObject_GC_DelFromPool(void *op, int64_t pool_id)
-{
-    // TODO make it better, for now it is a copy-pasta, so not a good thing
-    PyGC_Head *g = AS_GC(op);
-    if (_PyObject_GC_IS_TRACKED(op)) {
-        gc_list_remove(g);
-    }
-    PyThreadState *tstate = _PyThreadState_GET();
-    GCState *gcstate = &tstate->interp->gc;
-    if (gcstate->generations[0].count > 0) {
-        gcstate->generations[0].count--;
-    }
-
-    PyObject_FreeFromPool(g, pool_id);
 }

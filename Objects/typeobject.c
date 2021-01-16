@@ -1047,23 +1047,14 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
     int64_t id;
 
     if (_PyType_IS_GC(type)) {
-        // (elsa) ADDED THIS
         if (type == &PyModule_Type) {
-            PyInterpreterState *interp = _PyInterpreterState_Get();
-
-            if ((id = sm_add_mpool(type->tp_name)) < 0) {
-                fprintf(stderr, "type-object: error while adding a new pool\n");
-            }
-
-            obj = _PyObject_GC_Malloc(size, id); // TODO change arg
-
-            // TODO: add ID on top of stack
-            interp->md_ids.stack[interp->md_ids.sp] = id;
-        }
-        else {
-            obj = _PyObject_GC_Malloc(size, -1); // ADDED default arg
-        }
-
+          id = sm_add_mpool(type->tp_name);
+          if (id < 0) {
+            fprintf(stderr, "Failed to allocate a pool\n");
+            exit(33);
+          }
+        } 
+        obj = _PyObject_GC_Malloc(size);
     }
     else {
         obj = (PyObject *)PyObject_MALLOC(size);
