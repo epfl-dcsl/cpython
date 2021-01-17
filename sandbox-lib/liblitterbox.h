@@ -87,6 +87,8 @@ extern void SB_RegisterSandboxDependency(long int p0, char* p1);
 
 extern void SB_RegisterGrowth(int p0, void* p1, size_t p2);
 
+extern void SB_AddSection(int p0, void* p1, size_t p2);
+
 #ifdef __cplusplus
 }
 #endif

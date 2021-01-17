@@ -6,7 +6,7 @@
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
 #include "structmember.h"         // PyMemberDef
 
-#include "smalloc.h" // (elsa) ADDED THIS
+#include "multiheap.h" // (elsa) ADDED THIS
 #include "liblitterbox.h"
 
 static Py_ssize_t max_module_number;
@@ -89,12 +89,12 @@ PyModule_NewObject(PyObject *name)
 {
     PyModuleObject *m;
     // (elsa) ADDED THIS
-    int64_t id = sm_add_mpool(PyUnicode_AsUTF8(name));
+    int64_t id = mh_new_id(PyUnicode_AsUTF8(name));
     if (id < 0) {
         fprintf(stderr, "module-object: error while adding a new pool\n");
         exit(33);
     }
-    SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
+    //SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
     m = PyObject_GC_New(PyModuleObject, &PyModule_Type);
     //m = PyObject_GC_NewFromPool(PyModuleObject, &PyModule_Type, id);
 
@@ -674,12 +674,12 @@ static int
 module___init___impl(PyModuleObject *self, PyObject *name, PyObject *doc)
 /*[clinic end generated code: output=e7e721c26ce7aad7 input=57f9e177401e5e1e]*/
 {
-    int64_t id = sm_add_mpool(PyUnicode_AsUTF8(name));
+    int64_t id = mh_new_id(PyUnicode_AsUTF8(name));
     if (id < 0) {
       fprintf(stderr, "Could not register the module :(\n");
       exit(33);
     }
-    SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
+    //SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
 
     PyObject *dict = self->md_dict;
     if (dict == NULL) {

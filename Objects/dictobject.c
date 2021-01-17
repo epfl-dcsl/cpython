@@ -117,8 +117,6 @@ converting the dict to the combined table.
 #include "dict-common.h"
 #include "stringlib/eq.h"    // unicode_eq()
 
-#include "smalloc.h"
-
 /*[clinic input]
 class dict "PyDictObject *" "&PyDict_Type"
 [clinic start generated code]*/

@@ -11,7 +11,7 @@
 
 #include <ctype.h>
 
-#include "smalloc.h" // (elsa) ADDED THIS
+#include "multiheap.h" 
 
 /*[clinic input]
 class type "PyTypeObject *" "&PyType_Type"
@@ -1048,7 +1048,7 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
 
     if (_PyType_IS_GC(type)) {
         if (type == &PyModule_Type) {
-          id = sm_add_mpool(type->tp_name);
+          id = mh_new_id(type->tp_name);
           if (id < 0) {
             fprintf(stderr, "Failed to allocate a pool\n");
             exit(33);

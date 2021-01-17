@@ -2,8 +2,7 @@
 #include "pycore_pymem.h"         // _PyTraceMalloc_Config
 
 #include <stdbool.h>
-#include "smalloc.h" // (elsa) ADDED THIS
-#include "smalloc_i.h"
+#include "multiheap.h" 
 
 /* Defined in tracemalloc.c */
 extern void _PyMem_DumpTraceback(int fd, const void *ptr);
@@ -120,12 +119,12 @@ _Pool_RawMalloc(void* ctx, size_t size)
       size = 1;
 #ifdef MY_IMPL
   int64_t id = PyObject_Get_Current_ModuleId();
-  return sm_malloc_from_pool(id, size);
+  return mh_malloc(id, size);
 #else
   size += HEADER_SZ;
   void* res = _PyMem_RawMalloc(ctx, size);
   struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
-  shdr->magic = NOT_MY_MAGIC;
+  shdr->sm_magic = NOT_SM_MAGIC;
   return HEADER_TO_USER(shdr);
 #endif
 }
@@ -153,14 +152,13 @@ _Pool_RawCalloc(void* ctx, size_t nelem, size_t elsize)
       elsize = 1;
   }
 #ifdef MY_IMPL
-  size_t size = nelem * elsize;
   int64_t id = PyObject_Get_Current_ModuleId();
-  return sm_malloc_from_pool(id, size);
+  return mh_calloc(id, nelem, elsize);
 #else
   size_t size = nelem * elsize + HEADER_SZ;
   void* res = _PyMem_RawMalloc(ctx, size);
   struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
-  shdr->magic = NOT_MY_MAGIC;
+  shdr->sm_magic = SM_NOT_MAGIC;
   return HEADER_TO_USER(shdr);
 #endif
 }
@@ -182,9 +180,9 @@ _Pool_RawRealloc(void* ctx, void *ptr, size_t size)
 #ifdef MY_IMPL
   if (ptr == NULL) {
     int64_t id = PyObject_Get_Current_ModuleId();
-    return sm_malloc_from_pool(id, size);
+    return mh_malloc(id, size);
   }
-  return sm_realloc_from_pool(ptr, size);
+  return mh_realloc(ptr, size);
 #else
   size += HEADER_SZ;
   if (ptr != NULL) {
@@ -192,7 +190,7 @@ _Pool_RawRealloc(void* ctx, void *ptr, size_t size)
   }
   void* res = _PyMem_RawRealloc(ctx, ptr, size);
   struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
-  shdr->magic = NOT_MY_MAGIC;
+  shdr->sm_magic = SM_NOT_MAGIC;
   return HEADER_TO_USER(shdr);
 #endif
 }
@@ -211,14 +209,14 @@ _Pool_RawFree(void* ctx, void *ptr)
   if (ptr == NULL) {
     return;
   }
-  sm_free_from_pool(ptr);
+  mh_free(ptr);
 #else
   if (ptr == NULL) {
     free(ptr);
     return;
   }
   struct smalloc_hdr *shdr = USER_TO_HEADER(ptr);
-  if (shdr->magic != (int32_t)(NOT_MY_MAGIC)) {
+  if (shdr->sm_magic != SM_NOT_MAGIC) {
     fprintf(stderr, "We free something we did not allocate?\n");
     exit(33);
   }
@@ -252,12 +250,12 @@ _PyObject_ArenaMmap(void *ctx, size_t size)
     if (ptr == MAP_FAILED)
         return NULL;
     assert(ptr != NULL);
-    //(aghosn) catch the mmap.
-    if (register_growth != NULL) {
+    //TODO(aghosn) catch the mmap.
+    /*if (register_growth != NULL) {
       register_growth(1, ptr, size);
-    } else {
-      fprintf(stderr, "There is a missing mmap error\n");
-    }
+    } else {*/
+    //fprintf(stderr, "There is a missing mmap error\n");
+    //}
     return ptr;
 }
 

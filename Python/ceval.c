@@ -32,7 +32,7 @@
 
 #include <ctype.h>
 
-#include "smalloc.h"
+#include "multiheap.h"
 #include "liblitterbox.h"
 
 #ifdef Py_DEBUG
@@ -4997,7 +4997,7 @@ int64_t PyObject_Get_Current_ModuleId() {
     fprintf(stderr, "We got a module that is not a module!\n");
     exit(33);
   }
-  int64_t id = sm_get_object_id(myMod);
+  int64_t id = mh_get_id(myMod);
   if (id < 0 ) {
     fprintf(stderr, "The module is not allocated by us\n");
     return 0;

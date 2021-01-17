@@ -33,8 +33,6 @@
 #include "pydtrace.h"
 #include "pytime.h"             // _PyTime_GetMonotonicClock()
 
-#include "smalloc.h"
-
 typedef struct _gc_runtime_state GCState;
 
 /*[clinic input]
