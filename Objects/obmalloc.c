@@ -1743,6 +1743,16 @@ pymalloc_alloc(void *ctx, size_t nbytes)
 static void *
 _PyObject_Malloc(void *ctx, size_t nbytes)
 {
+
+#ifdef MY_IMPL
+  int64_t id = PyObject_Get_Current_ModuleId();
+  void *ptr = mh_malloc(id, nbytes);
+  if (ptr == NULL) {
+    fprintf(stderr, "Euh okay cannot allocate for %ld\n", id);
+    exit(33);
+  }
+  return ptr;
+#else
     void* ptr = pymalloc_alloc(ctx, nbytes);
     if (LIKELY(ptr != NULL)) {
         return ptr;
@@ -1753,6 +1763,7 @@ _PyObject_Malloc(void *ctx, size_t nbytes)
         raw_allocated_blocks++;
     }
     return ptr;
+#endif
 }
 
 
@@ -1762,6 +1773,15 @@ _PyObject_Calloc(void *ctx, size_t nelem, size_t elsize)
     assert(elsize == 0 || nelem <= (size_t)PY_SSIZE_T_MAX / elsize);
     size_t nbytes = nelem * elsize;
 
+#ifdef MY_IMPL
+    int64_t id = PyObject_Get_Current_ModuleId();
+    void* ptr = mh_malloc(id, nbytes);
+    if (ptr == NULL) {
+      fprintf(stderr, "Cannot calloc for %ld\n", id);
+      exit(33);
+    }
+    return ptr;
+#else
     void* ptr = pymalloc_alloc(ctx, nbytes);
     if (LIKELY(ptr != NULL)) {
         memset(ptr, 0, nbytes);
@@ -1773,6 +1793,7 @@ _PyObject_Calloc(void *ctx, size_t nelem, size_t elsize)
         raw_allocated_blocks++;
     }
     return ptr;
+#endif
 }
 
 
@@ -2018,6 +2039,13 @@ pymalloc_free(void *ctx, void *p)
 static void
 _PyObject_Free(void *ctx, void *p)
 {
+
+#ifdef MY_IMPL
+  if (p == NULL) {
+    return;
+  }
+  mh_free(p);
+#else
     /* PyObject_Free(NULL) has no effect */
     if (p == NULL) {
         return;
@@ -2035,6 +2063,7 @@ _PyObject_Free(void *ctx, void *p)
         PyMem_RawFree(p);
         raw_allocated_blocks--;
     }
+#endif
 }
 
 
@@ -2111,6 +2140,24 @@ pymalloc_realloc(void *ctx, void **newptr_p, void *p, size_t nbytes)
 static void *
 _PyObject_Realloc(void *ctx, void *ptr, size_t nbytes)
 {
+#ifdef MY_IMPL
+    int64_t id = PyObject_Get_Current_ModuleId();
+    if (ptr == NULL) {
+      void *nptr = mh_malloc(id, nbytes);
+      if (nptr == NULL) {
+        fprintf(stderr, "Cannot realloc null %ld\n", id);
+        exit(33);
+      }
+      return nptr;
+    }
+    //TODO(aghosn) check that the realloc == current id?
+    void *nptr = mh_realloc(ptr, nbytes);
+    if (nptr == NULL) {
+      fprintf(stderr, "Cannot realloc non null %ld\n", id); 
+      exit(33);
+    }
+    return nptr;
+#else
     void *ptr2;
 
     if (ptr == NULL) {
@@ -2122,6 +2169,7 @@ _PyObject_Realloc(void *ctx, void *ptr, size_t nbytes)
     }
 
     return PyMem_RawRealloc(ptr, nbytes);
+#endif
 }
 
 #else   /* ! WITH_PYMALLOC */
