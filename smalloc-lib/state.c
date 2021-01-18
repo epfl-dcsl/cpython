@@ -17,6 +17,8 @@ extern void* PyMem_RawRealloc(void *ptr, size_t new_size);
 extern void PyMem_RawFree(void *ptr);
 extern void * PyMem_RawCalloc(size_t nelem, size_t elsize);
 extern void * PyMem_RawMalloc(size_t size);
+extern Py_ssize_t _Py_GetAllocatedBlocks(void);
+
 
 #define Py_GETENV(s) (getenv(s))
 
@@ -361,28 +363,28 @@ static size_t narenas_highwater = 0;
 
 static Py_ssize_t raw_allocated_blocks;
 
-Py_ssize_t
-_Py_GetAllocatedBlocks(void)
-{
-    Py_ssize_t n = raw_allocated_blocks;
-    /* add up allocated blocks for used pools */
-    for (uint i = 0; i < maxarenas; ++i) {
-        /* Skip arenas which are not allocated. */
-        if (arenas[i].address == 0) {
-            continue;
-        }
-
-        uintptr_t base = (uintptr_t)_Py_ALIGN_UP(arenas[i].address, POOL_SIZE);
-
-        /* visit every pool in the arena */
-        assert(base <= (uintptr_t) arenas[i].pool_address);
-        for (; base < (uintptr_t) arenas[i].pool_address; base += POOL_SIZE) {
-            poolp p = (poolp)base;
-            n += p->ref.count;
-        }
-    }
-    return n;
-}
+//Py_ssize_t
+//_Py_GetAllocatedBlocks(void)
+//{
+//    Py_ssize_t n = raw_allocated_blocks;
+//    /* add up allocated blocks for used pools */
+//    for (uint i = 0; i < maxarenas; ++i) {
+//        /* Skip arenas which are not allocated. */
+//        if (arenas[i].address == 0) {
+//            continue;
+//        }
+//
+//        uintptr_t base = (uintptr_t)_Py_ALIGN_UP(arenas[i].address, POOL_SIZE);
+//
+//        /* visit every pool in the arena */
+//        assert(base <= (uintptr_t) arenas[i].pool_address);
+//        for (; base < (uintptr_t) arenas[i].pool_address; base += POOL_SIZE) {
+//            poolp p = (poolp)base;
+//            n += p->ref.count;
+//        }
+//    }
+//    return n;
+//}
 
 
 /* Allocate a new arena.  If we run out of memory, return NULL.  Else
@@ -707,7 +709,7 @@ pymalloc_alloc(void *ctx, size_t nbytes)
 }
 
 void *
-_Extern_Malloc(void *ctx, size_t nbytes)
+_Extrn_Malloc(void *ctx, size_t nbytes)
 {
     void* ptr = pymalloc_alloc(ctx, nbytes);
     if (LIKELY(ptr != NULL)) {
@@ -1052,7 +1054,7 @@ pymalloc_realloc(void *ctx, void **newptr_p, void *p, size_t nbytes)
         size = nbytes;
     }
 
-    bp = _Extern_Malloc(ctx, nbytes);
+    bp = _Extrn_Malloc(ctx, nbytes);
     if (bp != NULL) {
         memcpy(bp, p, size);
         _Extrn_Free(ctx, p);

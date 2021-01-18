@@ -176,9 +176,15 @@ _PyObject_ArenaFree(void *ctx, void *ptr, size_t size)
 }
 #endif
 
+#define EXTERN_REPL 1
+
 #define MALLOC_ALLOC {NULL, _PyMem_RawMalloc, _PyMem_RawCalloc, _PyMem_RawRealloc, _PyMem_RawFree}
 #ifdef WITH_PYMALLOC
+# ifdef EXTERN_REPL
+#  define PYMALLOC_ALLOC {NULL, _Extrn_Malloc, _Extrn_Calloc, _Extrn_Realloc, _Extrn_Free}
+# else
 #  define PYMALLOC_ALLOC {NULL, _PyObject_Malloc, _PyObject_Calloc, _PyObject_Realloc, _PyObject_Free}
+# endif
 #endif
 
 #define PYRAW_ALLOC MALLOC_ALLOC
