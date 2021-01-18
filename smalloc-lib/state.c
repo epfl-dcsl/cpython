@@ -6,17 +6,17 @@
 #include <stdio.h>
 #include <sys/mman.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "pymacro.h"
 #include "mtypes.h"
+#include "mh_interface.h"
 
-static void *
-_PyMem_RawRealloc(void *ctx, void *ptr, size_t size)
-{
-    if (size == 0)
-        size = 1;
-    return realloc(ptr, size);
-}
+// We will use the thing from python, see if it works.
+extern void* PyMem_RawRealloc(void *ptr, size_t new_size);
+extern void PyMem_RawFree(void *ptr);
+extern void * PyMem_RawCalloc(size_t nelem, size_t elsize);
+extern void * PyMem_RawMalloc(size_t size);
 
 #define Py_GETENV(s) (getenv(s))
 
@@ -704,4 +704,375 @@ pymalloc_alloc(void *ctx, size_t nbytes)
     }
 
     return (void *)bp;
+}
+
+void *
+_Extern_Malloc(void *ctx, size_t nbytes)
+{
+    void* ptr = pymalloc_alloc(ctx, nbytes);
+    if (LIKELY(ptr != NULL)) {
+        return ptr;
+    }
+
+    ptr = PyMem_RawMalloc(nbytes);
+    if (ptr != NULL) {
+        raw_allocated_blocks++;
+    }
+    return ptr;
+}
+
+void *_Extrn_Calloc(void *ctx, size_t nelem, size_t elsize)
+{
+    assert(elsize == 0 || nelem <= (size_t)PY_SSIZE_T_MAX / elsize);
+    size_t nbytes = nelem * elsize;
+
+    void* ptr = pymalloc_alloc(ctx, nbytes);
+    if (LIKELY(ptr != NULL)) {
+        memset(ptr, 0, nbytes);
+        return ptr;
+    }
+
+    ptr = PyMem_RawCalloc(nelem, elsize);
+    if (ptr != NULL) {
+        raw_allocated_blocks++;
+    }
+    return ptr;
+}
+
+static void
+insert_to_usedpool(poolp pool)
+{
+    assert(pool->ref.count > 0);            /* else the pool is empty */
+
+    uint size = pool->szidx;
+    poolp next = usedpools[size + size];
+    poolp prev = next->prevpool;
+
+    /* insert pool before next:   prev <-> pool <-> next */
+    pool->nextpool = next;
+    pool->prevpool = prev;
+    next->prevpool = pool;
+    prev->nextpool = pool;
+}
+
+static void
+insert_to_freepool(poolp pool)
+{
+    poolp next = pool->nextpool;
+    poolp prev = pool->prevpool;
+    next->prevpool = prev;
+    prev->nextpool = next;
+
+    /* Link the pool to freepools.  This is a singly-linked
+     * list, and pool->prevpool isn't used there.
+     */
+    struct arena_object *ao = &arenas[pool->arenaindex];
+    pool->nextpool = ao->freepools;
+    ao->freepools = pool;
+    uint nf = ao->nfreepools;
+    /* If this is the rightmost arena with this number of free pools,
+     * nfp2lasta[nf] needs to change.  Caution:  if nf is 0, there
+     * are no arenas in usable_arenas with that value.
+     */
+    struct arena_object* lastnf = nfp2lasta[nf];
+    assert((nf == 0 && lastnf == NULL) ||
+           (nf > 0 &&
+            lastnf != NULL &&
+            lastnf->nfreepools == nf &&
+            (lastnf->nextarena == NULL ||
+             nf < lastnf->nextarena->nfreepools)));
+    if (lastnf == ao) {  /* it is the rightmost */
+        struct arena_object* p = ao->prevarena;
+        nfp2lasta[nf] = (p != NULL && p->nfreepools == nf) ? p : NULL;
+    }
+    ao->nfreepools = ++nf;
+
+    /* All the rest is arena management.  We just freed
+     * a pool, and there are 4 cases for arena mgmt:
+     * 1. If all the pools are free, return the arena to
+     *    the system free().  Except if this is the last
+     *    arena in the list, keep it to avoid thrashing:
+     *    keeping one wholly free arena in the list avoids
+     *    pathological cases where a simple loop would
+     *    otherwise provoke needing to allocate and free an
+     *    arena on every iteration.  See bpo-37257.
+     * 2. If this is the only free pool in the arena,
+     *    add the arena back to the `usable_arenas` list.
+     * 3. If the "next" arena has a smaller count of free
+     *    pools, we have to "slide this arena right" to
+     *    restore that usable_arenas is sorted in order of
+     *    nfreepools.
+     * 4. Else there's nothing more to do.
+     */
+    if (nf == ao->ntotalpools && ao->nextarena != NULL) {
+        /* Case 1.  First unlink ao from usable_arenas.
+         */
+        assert(ao->prevarena == NULL ||
+               ao->prevarena->address != 0);
+        assert(ao ->nextarena == NULL ||
+               ao->nextarena->address != 0);
+
+        /* Fix the pointer in the prevarena, or the
+         * usable_arenas pointer.
+         */
+        if (ao->prevarena == NULL) {
+            usable_arenas = ao->nextarena;
+            assert(usable_arenas == NULL ||
+                   usable_arenas->address != 0);
+        }
+        else {
+            assert(ao->prevarena->nextarena == ao);
+            ao->prevarena->nextarena =
+                ao->nextarena;
+        }
+        /* Fix the pointer in the nextarena. */
+        if (ao->nextarena != NULL) {
+            assert(ao->nextarena->prevarena == ao);
+            ao->nextarena->prevarena =
+                ao->prevarena;
+        }
+        /* Record that this arena_object slot is
+         * available to be reused.
+         */
+        ao->nextarena = unused_arena_objects;
+        unused_arena_objects = ao;
+
+        /* Free the entire arena. */
+        _PyObject_Arena.free(_PyObject_Arena.ctx,
+                             (void *)ao->address, ARENA_SIZE);
+        ao->address = 0;                        /* mark unassociated */
+        --narenas_currently_allocated;
+
+        return;
+    }
+
+    if (nf == 1) {
+        /* Case 2.  Put ao at the head of
+         * usable_arenas.  Note that because
+         * ao->nfreepools was 0 before, ao isn't
+         * currently on the usable_arenas list.
+         */
+        ao->nextarena = usable_arenas;
+        ao->prevarena = NULL;
+        if (usable_arenas)
+            usable_arenas->prevarena = ao;
+        usable_arenas = ao;
+        assert(usable_arenas->address != 0);
+        if (nfp2lasta[1] == NULL) {
+            nfp2lasta[1] = ao;
+        }
+
+        return;
+    }
+
+    /* If this arena is now out of order, we need to keep
+     * the list sorted.  The list is kept sorted so that
+     * the "most full" arenas are used first, which allows
+     * the nearly empty arenas to be completely freed.  In
+     * a few un-scientific tests, it seems like this
+     * approach allowed a lot more memory to be freed.
+     */
+    /* If this is the only arena with nf, record that. */
+    if (nfp2lasta[nf] == NULL) {
+        nfp2lasta[nf] = ao;
+    } /* else the rightmost with nf doesn't change */
+    /* If this was the rightmost of the old size, it remains in place. */
+    if (ao == lastnf) {
+        /* Case 4.  Nothing to do. */
+        return;
+    }
+    /* If ao were the only arena in the list, the last block would have
+     * gotten us out.
+     */
+    assert(ao->nextarena != NULL);
+
+    /* Case 3:  We have to move the arena towards the end of the list,
+     * because it has more free pools than the arena to its right.  It needs
+     * to move to follow lastnf.
+     * First unlink ao from usable_arenas.
+     */
+    if (ao->prevarena != NULL) {
+        /* ao isn't at the head of the list */
+        assert(ao->prevarena->nextarena == ao);
+        ao->prevarena->nextarena = ao->nextarena;
+    }
+    else {
+        /* ao is at the head of the list */
+        assert(usable_arenas == ao);
+        usable_arenas = ao->nextarena;
+    }
+    ao->nextarena->prevarena = ao->prevarena;
+    /* And insert after lastnf. */
+    ao->prevarena = lastnf;
+    ao->nextarena = lastnf->nextarena;
+    if (ao->nextarena != NULL) {
+        ao->nextarena->prevarena = ao;
+    }
+    lastnf->nextarena = ao;
+    /* Verify that the swaps worked. */
+    assert(ao->nextarena == NULL || nf <= ao->nextarena->nfreepools);
+    assert(ao->prevarena == NULL || nf > ao->prevarena->nfreepools);
+    assert(ao->nextarena == NULL || ao->nextarena->prevarena == ao);
+    assert((usable_arenas == ao && ao->prevarena == NULL)
+           || ao->prevarena->nextarena == ao);
+}
+
+/* Free a memory block allocated by pymalloc_alloc().
+   Return 1 if it was freed.
+   Return 0 if the block was not allocated by pymalloc_alloc(). */
+static inline int
+pymalloc_free(void *ctx, void *p)
+{
+    assert(p != NULL);
+
+#ifdef WITH_VALGRIND
+    if (UNLIKELY(running_on_valgrind > 0)) {
+        return 0;
+    }
+#endif
+
+    poolp pool = POOL_ADDR(p);
+    if (UNLIKELY(!address_in_range(p, pool))) {
+        return 0;
+    }
+    /* We allocated this address. */
+
+    /* Link p to the start of the pool's freeblock list.  Since
+     * the pool had at least the p block outstanding, the pool
+     * wasn't empty (so it's already in a usedpools[] list, or
+     * was full and is in no list -- it's not in the freeblocks
+     * list in any case).
+     */
+    assert(pool->ref.count > 0);            /* else it was empty */
+    block *lastfree = pool->freeblock;
+    *(block **)p = lastfree;
+    pool->freeblock = (block *)p;
+    pool->ref.count--;
+
+    if (UNLIKELY(lastfree == NULL)) {
+        /* Pool was full, so doesn't currently live in any list:
+         * link it to the front of the appropriate usedpools[] list.
+         * This mimics LRU pool usage for new allocations and
+         * targets optimal filling when several pools contain
+         * blocks of the same size class.
+         */
+        insert_to_usedpool(pool);
+        return 1;
+    }
+
+    /* freeblock wasn't NULL, so the pool wasn't full,
+     * and the pool is in a usedpools[] list.
+     */
+    if (LIKELY(pool->ref.count != 0)) {
+        /* pool isn't empty:  leave it in usedpools */
+        return 1;
+    }
+
+    /* Pool is now empty:  unlink from usedpools, and
+     * link to the front of freepools.  This ensures that
+     * previously freed pools will be allocated later
+     * (being not referenced, they are perhaps paged out).
+     */
+    insert_to_freepool(pool);
+    return 1;
+}
+
+void
+_Extrn_Free(void *ctx, void *p)
+{
+    /* PyObject_Free(NULL) has no effect */
+    if (p == NULL) {
+        return;
+    }
+
+    if (UNLIKELY(!pymalloc_free(ctx, p))) {
+        /* pymalloc didn't allocate this address */
+        PyMem_RawFree(p);
+        raw_allocated_blocks--;
+    }
+}
+
+/* pymalloc realloc.
+
+   If nbytes==0, then as the Python docs promise, we do not treat this like
+   free(p), and return a non-NULL result.
+
+   Return 1 if pymalloc reallocated memory and wrote the new pointer into
+   newptr_p.
+
+   Return 0 if pymalloc didn't allocated p. */
+static int
+pymalloc_realloc(void *ctx, void **newptr_p, void *p, size_t nbytes)
+{
+    void *bp;
+    poolp pool;
+    size_t size;
+
+    assert(p != NULL);
+
+#ifdef WITH_VALGRIND
+    /* Treat running_on_valgrind == -1 the same as 0 */
+    if (UNLIKELY(running_on_valgrind > 0)) {
+        return 0;
+    }
+#endif
+
+    pool = POOL_ADDR(p);
+    if (!address_in_range(p, pool)) {
+        /* pymalloc is not managing this block.
+
+           If nbytes <= SMALL_REQUEST_THRESHOLD, it's tempting to try to take
+           over this block.  However, if we do, we need to copy the valid data
+           from the C-managed block to one of our blocks, and there's no
+           portable way to know how much of the memory space starting at p is
+           valid.
+
+           As bug 1185883 pointed out the hard way, it's possible that the
+           C-managed block is "at the end" of allocated VM space, so that a
+           memory fault can occur if we try to copy nbytes bytes starting at p.
+           Instead we punt: let C continue to manage this block. */
+        return 0;
+    }
+
+    /* pymalloc is in charge of this block */
+    size = INDEX2SIZE(pool->szidx);
+    if (nbytes <= size) {
+        /* The block is staying the same or shrinking.
+
+           If it's shrinking, there's a tradeoff: it costs cycles to copy the
+           block to a smaller size class, but it wastes memory not to copy it.
+
+           The compromise here is to copy on shrink only if at least 25% of
+           size can be shaved off. */
+        if (4 * nbytes > 3 * size) {
+            /* It's the same, or shrinking and new/old > 3/4. */
+            *newptr_p = p;
+            return 1;
+        }
+        size = nbytes;
+    }
+
+    bp = _Extern_Malloc(ctx, nbytes);
+    if (bp != NULL) {
+        memcpy(bp, p, size);
+        _Extrn_Free(ctx, p);
+    }
+    *newptr_p = bp;
+    return 1;
+}
+
+void *
+_Extrn_Realloc(void *ctx, void *ptr, size_t nbytes)
+{
+    void *ptr2;
+
+    if (ptr == NULL) {
+        return _Extrn_Malloc(ctx, nbytes);
+    }
+
+    if (pymalloc_realloc(ctx, &ptr2, ptr, nbytes)) {
+        return ptr2;
+    }
+
+    return PyMem_RawRealloc(ptr, nbytes);
 }

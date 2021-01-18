@@ -2,8 +2,8 @@
 #include "pycore_pymem.h"         // _PyTraceMalloc_Config
 
 #include <stdbool.h>
-#include "multiheap.h" 
-#include "smalloc_i.h"
+#include "mh_interface.h"
+
 
 /* Defined in tracemalloc.c */
 extern void _PyMem_DumpTraceback(int fd, const void *ptr);
@@ -13,9 +13,6 @@ extern void _PyMem_DumpTraceback(int fd, const void *ptr);
 
 #undef  uint
 #define uint    unsigned int    /* assuming >= 16 bits */
-
-//#define MY_IMPL 1
-//#define MY_OBJ 1
 
 /* Forward declaration */
 static void* _PyMem_DebugRawMalloc(void *ctx, size_t size);
@@ -82,13 +79,8 @@ static void* _PyObject_Malloc(void *ctx, size_t size);
 static void* _PyObject_Calloc(void *ctx, size_t nelem, size_t elsize);
 static void _PyObject_Free(void *ctx, void *p);
 static void* _PyObject_Realloc(void *ctx, void *ptr, size_t size);
-
-/* @aghosn Forward declaration for replacement allocators */
-static void* _Pool_RawMalloc(void* ctx, size_t size);
-static void* _Pool_RawCalloc(void *ctx, size_t nelem, size_t elsize);
-static void _Pool_RawFree(void *ctx, void *p);
-static void* _Pool_RawRealloc(void *ctx, void *ptr, size_t size);
 #endif
+
 
 /* bpo-35053: Declare tracemalloc configuration here rather than
    Modules/_tracemalloc.c because _tracemalloc can be compiled as dynamic
@@ -108,24 +100,6 @@ _PyMem_RawMalloc(void *ctx, size_t size)
     return malloc(size);
 }
 
-// @aghosn wrapper for RawMalloc
-static void *
-_Pool_RawMalloc(void* ctx, size_t size)
-{
-  if (size == 0)
-      size = 1;
-#ifdef MY_IMPL
-  int64_t id = PyObject_Get_Current_ModuleId();
-  return mh_malloc(id, size);
-#else
-  size += HEADER_SZ;
-  void* res = _PyMem_RawMalloc(ctx, size);
-  struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
-  shdr->sm_magic = SM_NOT_MAGIC;
-  return HEADER_TO_USER(shdr);
-#endif
-}
-
 static void *
 _PyMem_RawCalloc(void *ctx, size_t nelem, size_t elsize)
 {
@@ -140,26 +114,6 @@ _PyMem_RawCalloc(void *ctx, size_t nelem, size_t elsize)
     return calloc(nelem, elsize);
 }
 
-// @aghosn wrapper for RawCalloc
-static void *
-_Pool_RawCalloc(void* ctx, size_t nelem, size_t elsize)
-{
-  if (nelem == 0 || elsize == 0) {
-      nelem = 1;
-      elsize = 1;
-  }
-#ifdef MY_IMPL
-  int64_t id = PyObject_Get_Current_ModuleId();
-  return mh_calloc(id, nelem, elsize);
-#else
-  size_t size = nelem * elsize + HEADER_SZ;
-  void* res = _PyMem_RawMalloc(ctx, size);
-  struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
-  shdr->sm_magic = SM_NOT_MAGIC;
-  return HEADER_TO_USER(shdr);
-#endif
-}
-
 static void *
 _PyMem_RawRealloc(void *ctx, void *ptr, size_t size)
 {
@@ -168,59 +122,11 @@ _PyMem_RawRealloc(void *ctx, void *ptr, size_t size)
     return realloc(ptr, size);
 }
 
-// @aghosn wrapper for RawRealloc
-static void *
-_Pool_RawRealloc(void* ctx, void *ptr, size_t size)
-{
-  if (size == 0)
-      size = 1;
-#ifdef MY_IMPL
-  if (ptr == NULL) {
-    int64_t id = PyObject_Get_Current_ModuleId();
-    return mh_malloc(id, size);
-  }
-  return mh_realloc(ptr, size);
-#else
-  size += HEADER_SZ;
-  if (ptr != NULL) {
-    ptr = (void*) USER_TO_HEADER(ptr);
-  }
-  void* res = _PyMem_RawRealloc(ctx, ptr, size);
-  struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
-  shdr->sm_magic = SM_NOT_MAGIC;
-  return HEADER_TO_USER(shdr);
-#endif
-}
-
 static void
 _PyMem_RawFree(void *ctx, void *ptr)
 {
     free(ptr);
 }
-
-// @aghosn wrapper for RawRealloc
-static void 
-_Pool_RawFree(void* ctx, void *ptr)
-{
-#ifdef MY_IMPL
-  if (ptr == NULL) {
-    return;
-  }
-  mh_free(ptr);
-#else
-  if (ptr == NULL) {
-    free(ptr);
-    return;
-  }
-  struct smalloc_hdr *shdr = USER_TO_HEADER(ptr);
-  if (shdr->sm_magic != SM_NOT_MAGIC) {
-    fprintf(stderr, "We free something we did not allocate?\n");
-    exit(33);
-  }
-  _PyMem_RawFree(ctx, (void*)(shdr));
-#endif
-}
-
 
 
 #ifdef MS_WINDOWS
@@ -247,12 +153,6 @@ _PyObject_ArenaMmap(void *ctx, size_t size)
     if (ptr == MAP_FAILED)
         return NULL;
     assert(ptr != NULL);
-    //TODO(aghosn) catch the mmap.
-    /*if (register_growth != NULL) {
-      register_growth(1, ptr, size);
-    } else {*/
-    //fprintf(stderr, "There is a missing mmap error\n");
-    //}
     return ptr;
 }
 
@@ -277,15 +177,13 @@ _PyObject_ArenaFree(void *ctx, void *ptr, size_t size)
 #endif
 
 #define MALLOC_ALLOC {NULL, _PyMem_RawMalloc, _PyMem_RawCalloc, _PyMem_RawRealloc, _PyMem_RawFree}
-#define POOLRAW_ALLOC {NULL, _Pool_RawMalloc, _Pool_RawCalloc, _Pool_RawRealloc, _Pool_RawFree}
 #ifdef WITH_PYMALLOC
 #  define PYMALLOC_ALLOC {NULL, _PyObject_Malloc, _PyObject_Calloc, _PyObject_Realloc, _PyObject_Free}
-#  define POOLMALLOC_ALLOC {NULL, _Pool_Malloc, _Pool_Calloc, _Pool_Realloc, _Pool_Free}
 #endif
 
-#define PYRAW_ALLOC POOLRAW_ALLOC //MALLOC_ALLOC
+#define PYRAW_ALLOC MALLOC_ALLOC
 #ifdef WITH_PYMALLOC
-#  define PYOBJ_ALLOC PYMALLOC_ALLOC //POOLMALLOC_ALLOC
+#  define PYOBJ_ALLOC PYMALLOC_ALLOC
 #else
 #  define PYOBJ_ALLOC MALLOC_ALLOC
 #endif
@@ -318,7 +216,6 @@ static PyMemAllocatorEx _PyMem_Raw = PYDBGRAW_ALLOC;
 static PyMemAllocatorEx _PyMem = PYDBGMEM_ALLOC;
 static PyMemAllocatorEx _PyObject = PYDBGOBJ_ALLOC;
 #else
-//TODO(aghosn) here might be a good spot to go and replace allocation at once!!
 static PyMemAllocatorEx _PyMem_Raw = PYRAW_ALLOC;
 static PyMemAllocatorEx _PyMem = PYMEM_ALLOC;
 static PyMemAllocatorEx _PyObject = PYOBJ_ALLOC;
@@ -812,6 +709,7 @@ PyObject_Free(void *ptr)
 {
     _PyObject.free(_PyObject.ctx, ptr);
 }
+
 
 /* If we're using GCC, use __builtin_expect() to reduce overhead of
    the valgrind checks */
@@ -1740,16 +1638,6 @@ pymalloc_alloc(void *ctx, size_t nbytes)
 static void *
 _PyObject_Malloc(void *ctx, size_t nbytes)
 {
-
-#ifdef MY_OBJ
-  int64_t id = PyObject_Get_Current_ModuleId();
-  void *ptr = mh_malloc(id, nbytes);
-  if (ptr == NULL) {
-    fprintf(stderr, "Euh okay cannot allocate for %ld\n", id);
-    exit(33);
-  }
-  return ptr;
-#else
     void* ptr = pymalloc_alloc(ctx, nbytes);
     if (LIKELY(ptr != NULL)) {
         return ptr;
@@ -1760,7 +1648,6 @@ _PyObject_Malloc(void *ctx, size_t nbytes)
         raw_allocated_blocks++;
     }
     return ptr;
-#endif
 }
 
 
@@ -1770,15 +1657,6 @@ _PyObject_Calloc(void *ctx, size_t nelem, size_t elsize)
     assert(elsize == 0 || nelem <= (size_t)PY_SSIZE_T_MAX / elsize);
     size_t nbytes = nelem * elsize;
 
-#ifdef MY_OBJ
-    int64_t id = PyObject_Get_Current_ModuleId();
-    void* ptr = mh_malloc(id, nbytes);
-    if (ptr == NULL) {
-      fprintf(stderr, "Cannot calloc for %ld\n", id);
-      exit(33);
-    }
-    return ptr;
-#else
     void* ptr = pymalloc_alloc(ctx, nbytes);
     if (LIKELY(ptr != NULL)) {
         memset(ptr, 0, nbytes);
@@ -1790,7 +1668,6 @@ _PyObject_Calloc(void *ctx, size_t nelem, size_t elsize)
         raw_allocated_blocks++;
     }
     return ptr;
-#endif
 }
 
 
@@ -2036,31 +1913,16 @@ pymalloc_free(void *ctx, void *p)
 static void
 _PyObject_Free(void *ctx, void *p)
 {
-
-#ifdef MY_OBJ
-  if (p == NULL) {
-    return;
-  }
-  mh_free(p);
-#else
     /* PyObject_Free(NULL) has no effect */
     if (p == NULL) {
         return;
     }
-  
+
     if (UNLIKELY(!pymalloc_free(ctx, p))) {
         /* pymalloc didn't allocate this address */
-        /* @aghosn maybe we did. */
-        //int64_t id = sm_get_object_id(p);
-        //if (id >= 0) {
-        //  printf(stderr, "Hey, we got it!\n");
-        //  sm_free_from_pool(p);
-        //  return;
-        //}
         PyMem_RawFree(p);
         raw_allocated_blocks--;
     }
-#endif
 }
 
 
@@ -2137,24 +1999,6 @@ pymalloc_realloc(void *ctx, void **newptr_p, void *p, size_t nbytes)
 static void *
 _PyObject_Realloc(void *ctx, void *ptr, size_t nbytes)
 {
-#ifdef MY_OBJ
-    int64_t id = PyObject_Get_Current_ModuleId();
-    if (ptr == NULL) {
-      void *nptr = mh_malloc(id, nbytes);
-      if (nptr == NULL) {
-        fprintf(stderr, "Cannot realloc null %ld\n", id);
-        exit(33);
-      }
-      return nptr;
-    }
-    //TODO(aghosn) check that the realloc == current id?
-    void *nptr = mh_realloc(ptr, nbytes);
-    if (nptr == NULL) {
-      fprintf(stderr, "Cannot realloc non null %ld\n", id); 
-      exit(33);
-    }
-    return nptr;
-#else
     void *ptr2;
 
     if (ptr == NULL) {
@@ -2166,7 +2010,6 @@ _PyObject_Realloc(void *ctx, void *ptr, size_t nbytes)
     }
 
     return PyMem_RawRealloc(ptr, nbytes);
-#endif
 }
 
 #else   /* ! WITH_PYMALLOC */

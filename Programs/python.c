@@ -1,7 +1,7 @@
 /* Minimal main program -- everything is loaded from the library */
 
 #include "Python.h"
-#include "multiheap.h"
+//#include "multiheap.h"
 #include "liblitterbox.h"
 
 #ifdef MS_WINDOWS
@@ -18,9 +18,9 @@ main(int argc, char **argv)
     int ret;
     /*(aghosn) init the dynamic backend, reads the env-var from go.*/
     SB_Initialize();
-    register_id = &SB_RegisterPackageId; 
-    register_growth = &SB_AddSection;
-    mh_init_allocator();
+   // register_id = &SB_RegisterPackageId; 
+   // register_growth = &SB_AddSection;
+   // mh_init_allocator();
     ret = Py_BytesMain(argc, argv);
     return ret;
 }

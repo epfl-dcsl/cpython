@@ -11,7 +11,7 @@
 
 #include <ctype.h>
 
-#include "multiheap.h" 
+//#include "multiheap.h" 
 
 /*[clinic input]
 class type "PyTypeObject *" "&PyType_Type"
@@ -1047,13 +1047,13 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
     int64_t id;
 
     if (_PyType_IS_GC(type)) {
-        if (type == &PyModule_Type) {
-          id = mh_new_id(type->tp_name);
-          if (id < 0) {
-            fprintf(stderr, "Failed to allocate a pool\n");
-            exit(33);
-          }
-        } 
+       // if (type == &PyModule_Type) {
+       //   id = mh_new_id(type->tp_name);
+       //   if (id < 0) {
+       //     fprintf(stderr, "Failed to allocate a pool\n");
+       //     exit(33);
+       //   }
+       // } 
         obj = _PyObject_GC_Malloc(size);
     }
     else {

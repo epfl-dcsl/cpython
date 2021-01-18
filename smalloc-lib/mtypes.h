@@ -3,6 +3,9 @@
 
 typedef ssize_t Py_ssize_t;
 
+/* Largest positive value of type Py_ssize_t. */
+#define PY_SSIZE_T_MAX ((Py_ssize_t)(((size_t)-1)>>1))
+
 typedef struct {
     /* user context passed as the first argument to the 2 functions */
     void *ctx;

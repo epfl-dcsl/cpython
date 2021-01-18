@@ -6,7 +6,7 @@
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
 #include "structmember.h"         // PyMemberDef
 
-#include "multiheap.h" // (elsa) ADDED THIS
+//#include "multiheap.h" 
 #include "liblitterbox.h"
 
 static Py_ssize_t max_module_number;
@@ -89,7 +89,7 @@ PyModule_NewObject(PyObject *name)
 {
     PyModuleObject *m;
     // (elsa) ADDED THIS
-    int64_t id = mh_new_id(PyUnicode_AsUTF8(name));
+    int64_t id = 0; //mh_new_id(PyUnicode_AsUTF8(name));
     if (id < 0) {
         fprintf(stderr, "module-object: error while adding a new pool\n");
         exit(33);
@@ -673,7 +673,7 @@ static int
 module___init___impl(PyModuleObject *self, PyObject *name, PyObject *doc)
 /*[clinic end generated code: output=e7e721c26ce7aad7 input=57f9e177401e5e1e]*/
 {
-    int64_t id = mh_new_id(PyUnicode_AsUTF8(name));
+    int64_t id = 0; //mh_new_id(PyUnicode_AsUTF8(name));
     if (id < 0) {
       fprintf(stderr, "Could not register the module :(\n");
       exit(33);
