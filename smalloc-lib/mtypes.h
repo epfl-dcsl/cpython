@@ -1,6 +1,8 @@
 #ifndef _MTYPES_H
 #define _MTYPES_H
 
+#include <stdint.h>
+
 typedef ssize_t Py_ssize_t;
 
 /* Largest positive value of type Py_ssize_t. */
