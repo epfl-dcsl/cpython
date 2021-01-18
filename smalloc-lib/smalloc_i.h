@@ -14,7 +14,7 @@
 
 struct smalloc_hdr {
   uint32_t sm_magic;  /* a magic number */
-  int64_t pool_id;    /* the pool id of the object */
+  void* arena;        /* pointer to the arena. */
 	size_t rsz;         /* real allocated size with overhead (if any) */
 	size_t usz;         /* exact user size as reported by s_szalloc */
 	uintptr_t tag;      /* sum of all the above, hashed value */

@@ -67,7 +67,6 @@ outfound:		if (found) {
 				uintptr_t tag;
 				/* allocate and return this block */
         shdr->sm_magic = SM_MAGIC; 
-        shdr->pool_id = id;
 				shdr->rsz = x;
 				shdr->usz = n;
 				shdr->tag = tag = smalloc_mktag(shdr);

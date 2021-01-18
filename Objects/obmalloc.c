@@ -14,7 +14,7 @@ extern void _PyMem_DumpTraceback(int fd, const void *ptr);
 #undef  uint
 #define uint    unsigned int    /* assuming >= 16 bits */
 
-#define MY_IMPL 1
+//#define MY_IMPL 1
 //#define MY_OBJ 1
 
 /* Forward declaration */

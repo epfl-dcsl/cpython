@@ -74,6 +74,11 @@ void mh_heap_mv_to_head(mh_heap* heap, mh_arena* arena);
 /* mh_arena functions */
 mh_arena* mh_new_arena(mh_heap* parent, size_t pool_size);
 
+/* Helper macros */
+
+#define AS_ARENA(ptr) ((mh_arena*)ptr)
+#define HDR_GET_ID(shdr) ((AS_ARENA(shdr->arena))->parent->pool_id)
+
 #ifdef __cplusplus
 }
 #endif

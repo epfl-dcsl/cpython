@@ -87,7 +87,6 @@ int64_t mh_get_id(void* ptr) {
 }
   
 #else
-//TODO(aghosn) get the name of the pool later on.
 int64_t mh_new_id(const char* name) {
   int64_t id = mhallocator.next_id++;
   /* we ran out of space in the mheaps. */
@@ -147,7 +146,7 @@ void *mh_realloc(void *ptr, size_t size) {
 void mh_free(void* ptr) {
   check(ptr != NULL, "calling free with null pointer.\n");
   struct smalloc_hdr *shdr = USER_TO_HEADER(ptr); 
-  int64_t id = shdr->pool_id;
+  int64_t id = HDR_GET_ID(shdr);
   check(id >= 0 && id < mhallocator.mhsize, "invalid id");
   mh_heap* heap = mhallocator.mheaps[id];
   check_null(heap);
@@ -158,7 +157,7 @@ int64_t mh_get_id(void* ptr) {
   check(ptr != NULL, "getting id of null\n");
   struct smalloc_hdr *shdr = USER_TO_HEADER(ptr);
   check(smalloc_check_magic(shdr), "magic header is not correct\n");
-  return shdr->pool_id;
+  return HDR_GET_ID(shdr);
 }
 
 #endif //REAL_ALLOC
@@ -184,6 +183,7 @@ void *mh_heap_malloc(mh_heap* heap, size_t size) {
     void* ptr = sm_malloc_pool(heap->pool_id, &arena->pool, size);
     if (ptr != NULL) {
       struct smalloc_hdr* shdr = USER_TO_HEADER(ptr);
+      shdr->arena = (void*)(arena);
       arena->num_elem++;
       arena->used_bytes += shdr->rsz; 
       return ptr;
@@ -205,20 +205,17 @@ void mh_heap_free(mh_heap* heap, void* ptr) {
   check_null(heap);
   check_null(ptr);
   struct smalloc_hdr *shdr = USER_TO_HEADER(ptr);
+  check(smalloc_check_magic(shdr), "Error not magic\n"); 
+  mh_arena* arena = AS_ARENA(shdr->arena); 
+  check(smalloc_is_alloc(&arena->pool, shdr), "It is not an alloc\n");
   size_t size = shdr->rsz;
-  for (mh_arena* arena = heap->lhead; arena != NULL; arena = arena->next) {
-    struct smalloc_pool* pool = &arena->pool;
-    if (smalloc_is_alloc(pool, shdr)) {
-      sm_free_pool(pool, ptr); 
-      arena->num_elem--;
-      arena->used_bytes -= ((uint64_t) size);
-      if (arena->num_elem == 0) {
-        mh_heap_mv_to_head(heap, arena);
-      }
-      return;
-    } 
+  sm_free_pool(&arena->pool, ptr);
+  arena->num_elem--;
+  arena->used_bytes -= ((uint64_t) size);
+  if (arena->num_elem == 0) {
+    check(arena->used_bytes == 0, "No elem, but used bytes not 0\n");
+    mh_heap_mv_to_head(heap, arena);
   }
-  check(0, "Unable to free");
 }
 
 void mh_heap_mv_to_head(mh_heap* heap, mh_arena* arena) {
