@@ -47,10 +47,10 @@ static ObjectArenaAllocator _PyObject_Arena = {NULL,
 /* Allocate a new arena.  If we run out of memory, return NULL.  Else
  * allocate a new arena, and return the address of an arena_object
  * describing the new arena.  It's expected that the caller will set
- * `mhd_state->usable_arenas` to the return value.
+ * `mhcurr->usable_arenas` to the return value.
  */
 static struct arena_object*
-new_arena(void)
+new_arena(mh_state* mhcurr)
 {
     struct arena_object* arenaobj;
     uint excess;        /* number of bytes above pool alignment */
@@ -62,7 +62,7 @@ new_arena(void)
         debug_stats = (opt != NULL && *opt != '\0');
     }
 
-    if (mhd_state->unused_arena_objects == NULL) {
+    if (mhcurr->unused_arena_objects == NULL) {
         uint i;
         uint numarenas;
         size_t nbytes;
@@ -70,18 +70,18 @@ new_arena(void)
         /* Double the number of arena objects on each allocation.
          * Note that it's possible for `numarenas` to overflow.
          */
-        numarenas = mhd_state->maxarenas ? mhd_state->maxarenas << 1 : INITIAL_ARENA_OBJECTS;
-        if (numarenas <= mhd_state->maxarenas)
+        numarenas = mhcurr->maxarenas ? mhcurr->maxarenas << 1 : INITIAL_ARENA_OBJECTS;
+        if (numarenas <= mhcurr->maxarenas)
             return NULL;                /* overflow */
 #if SIZEOF_SIZE_T <= SIZEOF_INT
-        if (numarenas > SIZE_MAX / sizeof(*(mhd_state->arenas)))
+        if (numarenas > SIZE_MAX / sizeof(*(mhcurr->arenas)))
             return NULL;                /* overflow */
 #endif
-        nbytes = numarenas * sizeof(*(mhd_state->arenas));
-        arenaobj = (struct arena_object *)PyMem_RawRealloc(mhd_state->arenas, nbytes);
+        nbytes = numarenas * sizeof(*(mhcurr->arenas));
+        arenaobj = (struct arena_object *)PyMem_RawRealloc(mhcurr->arenas, nbytes);
         if (arenaobj == NULL)
             return NULL;
-        mhd_state->arenas = arenaobj;
+        mhcurr->arenas = arenaobj;
 
         /* We might need to fix pointers that were copied.  However,
          * new_arena only gets called when all the pages in the
@@ -89,41 +89,41 @@ new_arena(void)
          * into the old array. Thus, we don't have to worry about
          * invalid pointers.  Just to be sure, some asserts:
          */
-        assert(mhd_state->usable_arenas == NULL);
-        assert(mhd_state->unused_arena_objects == NULL);
+        assert(mhcurr->usable_arenas == NULL);
+        assert(mhcurr->unused_arena_objects == NULL);
 
-        /* Put the new arenas on the mhd_state->unused_arena_objects list. */
-        for (i = mhd_state->maxarenas; i < numarenas; ++i) {
-            mhd_state->arenas[i].address = 0;              /* mark as unassociated */
-            mhd_state->arenas[i].nextarena = i < numarenas - 1 ?
-                                   &mhd_state->arenas[i+1] : NULL;
+        /* Put the new arenas on the mhcurr->unused_arena_objects list. */
+        for (i = mhcurr->maxarenas; i < numarenas; ++i) {
+            mhcurr->arenas[i].address = 0;              /* mark as unassociated */
+            mhcurr->arenas[i].nextarena = i < numarenas - 1 ?
+                                   &mhcurr->arenas[i+1] : NULL;
         }
 
         /* Update globals. */
-        mhd_state->unused_arena_objects = &(mhd_state->arenas[mhd_state->maxarenas]);
-        mhd_state->maxarenas = numarenas;
+        mhcurr->unused_arena_objects = &(mhcurr->arenas[mhcurr->maxarenas]);
+        mhcurr->maxarenas = numarenas;
     }
 
     /* Take the next available arena object off the head of the list. */
-    assert(mhd_state->unused_arena_objects != NULL);
-    arenaobj = mhd_state->unused_arena_objects;
-    mhd_state->unused_arena_objects = arenaobj->nextarena;
+    assert(mhcurr->unused_arena_objects != NULL);
+    arenaobj = mhcurr->unused_arena_objects;
+    mhcurr->unused_arena_objects = arenaobj->nextarena;
     assert(arenaobj->address == 0);
     address = _PyObject_Arena.alloc(_PyObject_Arena.ctx, ARENA_SIZE);
     if (address == NULL) {
         /* The allocation failed: return NULL after putting the
          * arenaobj back.
          */
-        arenaobj->nextarena = mhd_state->unused_arena_objects;
-        mhd_state->unused_arena_objects = arenaobj;
+        arenaobj->nextarena = mhcurr->unused_arena_objects;
+        mhcurr->unused_arena_objects = arenaobj;
         return NULL;
     }
     arenaobj->address = (uintptr_t)address;
 
-    ++(mhd_state->narenas_currently_allocated);
-    ++(mhd_state->ntimes_arena_allocated);
-    if (mhd_state->narenas_currently_allocated > mhd_state->narenas_highwater)
-        mhd_state->narenas_highwater = mhd_state->narenas_currently_allocated;
+    ++(mhcurr->narenas_currently_allocated);
+    ++(mhcurr->ntimes_arena_allocated);
+    if (mhcurr->narenas_currently_allocated > mhcurr->narenas_highwater)
+        mhcurr->narenas_highwater = mhcurr->narenas_currently_allocated;
     arenaobj->freepools = NULL;
     /* pool_address <- first pool-aligned address in the arena
        nfreepools <- number of whole pools that fit after alignment */
@@ -142,7 +142,7 @@ new_arena(void)
 static bool _Py_NO_SANITIZE_ADDRESS
             _Py_NO_SANITIZE_THREAD
             _Py_NO_SANITIZE_MEMORY
-address_in_range(void *p, poolp pool)
+address_in_range(mh_state* mhcurr, void *p, poolp pool)
 {
     // Since address_in_range may be reading from memory which was not allocated
     // by Python, it is important that pool->arenaindex is read only once, as
@@ -150,9 +150,9 @@ address_in_range(void *p, poolp pool)
     // the GIL. The following dance forces the compiler to read pool->arenaindex
     // only once.
     uint arenaindex = *((volatile uint *)&pool->arenaindex);
-    return arenaindex < mhd_state->maxarenas &&
-        (uintptr_t)p - mhd_state->arenas[arenaindex].address < ARENA_SIZE &&
-        mhd_state->arenas[arenaindex].address != 0;
+    return arenaindex < mhcurr->maxarenas &&
+        (uintptr_t)p - mhcurr->arenas[arenaindex].address < ARENA_SIZE &&
+        mhcurr->arenas[arenaindex].address != 0;
 }
 
 
@@ -183,60 +183,60 @@ pymalloc_pool_extend(poolp pool, uint size)
  * This function takes new pool and allocate a block from it.
  */
 static void*
-allocate_from_new_pool(uint size)
+allocate_from_new_pool(mh_state* mhcurr, uint size)
 {
     /* There isn't a pool of the right size class immediately
      * available:  use a free pool.
      */
-    if (UNLIKELY(mhd_state->usable_arenas == NULL)) {
+    if (UNLIKELY(mhcurr->usable_arenas == NULL)) {
         /* No arena has a free pool:  allocate a new arena. */
 #ifdef WITH_MEMORY_LIMITS
-        if (mhd_state->narenas_currently_allocated >= MAX_ARENAS) {
+        if (mhcurr->narenas_currently_allocated >= MAX_ARENAS) {
             return NULL;
         }
 #endif
-        mhd_state->usable_arenas = new_arena();
-        if (mhd_state->usable_arenas == NULL) {
+        mhcurr->usable_arenas = new_arena(mhcurr);
+        if (mhcurr->usable_arenas == NULL) {
             return NULL;
         }
-        mhd_state->usable_arenas->nextarena = mhd_state->usable_arenas->prevarena = NULL;
-        assert(mhd_state->nfp2lasta[mhd_state->usable_arenas->nfreepools] == NULL);
-        mhd_state->nfp2lasta[mhd_state->usable_arenas->nfreepools] = mhd_state->usable_arenas;
+        mhcurr->usable_arenas->nextarena = mhcurr->usable_arenas->prevarena = NULL;
+        assert(mhcurr->nfp2lasta[mhcurr->usable_arenas->nfreepools] == NULL);
+        mhcurr->nfp2lasta[mhcurr->usable_arenas->nfreepools] = mhcurr->usable_arenas;
     }
-    assert(mhd_state->usable_arenas->address != 0);
+    assert(mhcurr->usable_arenas->address != 0);
 
     /* This arena already had the smallest nfreepools value, so decreasing
      * nfreepools doesn't change that, and we don't need to rearrange the
-     * mhd_state->usable_arenas list.  However, if the arena becomes wholly allocated,
-     * we need to remove its arena_object from mhd_state->usable_arenas.
+     * mhcurr->usable_arenas list.  However, if the arena becomes wholly allocated,
+     * we need to remove its arena_object from mhcurr->usable_arenas.
      */
-    assert(mhd_state->usable_arenas->nfreepools > 0);
-    if (mhd_state->nfp2lasta[mhd_state->usable_arenas->nfreepools] == mhd_state->usable_arenas) {
+    assert(mhcurr->usable_arenas->nfreepools > 0);
+    if (mhcurr->nfp2lasta[mhcurr->usable_arenas->nfreepools] == mhcurr->usable_arenas) {
         /* It's the last of this size, so there won't be any. */
-        mhd_state->nfp2lasta[mhd_state->usable_arenas->nfreepools] = NULL;
+        mhcurr->nfp2lasta[mhcurr->usable_arenas->nfreepools] = NULL;
     }
     /* If any free pools will remain, it will be the new smallest. */
-    if (mhd_state->usable_arenas->nfreepools > 1) {
-        assert(mhd_state->nfp2lasta[mhd_state->usable_arenas->nfreepools - 1] == NULL);
-        mhd_state->nfp2lasta[mhd_state->usable_arenas->nfreepools - 1] = mhd_state->usable_arenas;
+    if (mhcurr->usable_arenas->nfreepools > 1) {
+        assert(mhcurr->nfp2lasta[mhcurr->usable_arenas->nfreepools - 1] == NULL);
+        mhcurr->nfp2lasta[mhcurr->usable_arenas->nfreepools - 1] = mhcurr->usable_arenas;
     }
 
     /* Try to get a cached free pool. */
-    poolp pool = mhd_state->usable_arenas->freepools;
+    poolp pool = mhcurr->usable_arenas->freepools;
     if (LIKELY(pool != NULL)) {
         /* Unlink from cached pools. */
-        mhd_state->usable_arenas->freepools = pool->nextpool;
-        mhd_state->usable_arenas->nfreepools--;
-        if (UNLIKELY(mhd_state->usable_arenas->nfreepools == 0)) {
+        mhcurr->usable_arenas->freepools = pool->nextpool;
+        mhcurr->usable_arenas->nfreepools--;
+        if (UNLIKELY(mhcurr->usable_arenas->nfreepools == 0)) {
             /* Wholly allocated:  remove. */
-            assert(mhd_state->usable_arenas->freepools == NULL);
-            assert(mhd_state->usable_arenas->nextarena == NULL ||
-                   mhd_state->usable_arenas->nextarena->prevarena ==
-                   mhd_state->usable_arenas);
-            mhd_state->usable_arenas = mhd_state->usable_arenas->nextarena;
-            if (mhd_state->usable_arenas != NULL) {
-                mhd_state->usable_arenas->prevarena = NULL;
-                assert(mhd_state->usable_arenas->address != 0);
+            assert(mhcurr->usable_arenas->freepools == NULL);
+            assert(mhcurr->usable_arenas->nextarena == NULL ||
+                   mhcurr->usable_arenas->nextarena->prevarena ==
+                   mhcurr->usable_arenas);
+            mhcurr->usable_arenas = mhcurr->usable_arenas->nextarena;
+            if (mhcurr->usable_arenas != NULL) {
+                mhcurr->usable_arenas->prevarena = NULL;
+                assert(mhcurr->usable_arenas->address != 0);
             }
         }
         else {
@@ -245,41 +245,41 @@ allocate_from_new_pool(uint size)
              * off all the arena's pools for the first
              * time.
              */
-            assert(mhd_state->usable_arenas->freepools != NULL ||
-                   mhd_state->usable_arenas->pool_address <=
-                   (block*)mhd_state->usable_arenas->address +
+            assert(mhcurr->usable_arenas->freepools != NULL ||
+                   mhcurr->usable_arenas->pool_address <=
+                   (block*)mhcurr->usable_arenas->address +
                        ARENA_SIZE - POOL_SIZE);
         }
     }
     else {
         /* Carve off a new pool. */
-        assert(mhd_state->usable_arenas->nfreepools > 0);
-        assert(mhd_state->usable_arenas->freepools == NULL);
-        pool = (poolp)mhd_state->usable_arenas->pool_address;
-        assert((block*)pool <= (block*)mhd_state->usable_arenas->address +
+        assert(mhcurr->usable_arenas->nfreepools > 0);
+        assert(mhcurr->usable_arenas->freepools == NULL);
+        pool = (poolp)mhcurr->usable_arenas->pool_address;
+        assert((block*)pool <= (block*)mhcurr->usable_arenas->address +
                                  ARENA_SIZE - POOL_SIZE);
-        pool->arenaindex = (uint)(mhd_state->usable_arenas - mhd_state->arenas);
-        assert(&(mhd_state->arenas[pool->arenaindex]) == mhd_state->usable_arenas);
+        pool->arenaindex = (uint)(mhcurr->usable_arenas - mhcurr->arenas);
+        assert(&(mhcurr->arenas[pool->arenaindex]) == mhcurr->usable_arenas);
         pool->szidx = DUMMY_SIZE_IDX;
-        mhd_state->usable_arenas->pool_address += POOL_SIZE;
-        --mhd_state->usable_arenas->nfreepools;
+        mhcurr->usable_arenas->pool_address += POOL_SIZE;
+        --mhcurr->usable_arenas->nfreepools;
 
-        if (mhd_state->usable_arenas->nfreepools == 0) {
-            assert(mhd_state->usable_arenas->nextarena == NULL ||
-                   mhd_state->usable_arenas->nextarena->prevarena ==
-                   mhd_state->usable_arenas);
+        if (mhcurr->usable_arenas->nfreepools == 0) {
+            assert(mhcurr->usable_arenas->nextarena == NULL ||
+                   mhcurr->usable_arenas->nextarena->prevarena ==
+                   mhcurr->usable_arenas);
             /* Unlink the arena:  it is completely allocated. */
-            mhd_state->usable_arenas = mhd_state->usable_arenas->nextarena;
-            if (mhd_state->usable_arenas != NULL) {
-                mhd_state->usable_arenas->prevarena = NULL;
-                assert(mhd_state->usable_arenas->address != 0);
+            mhcurr->usable_arenas = mhcurr->usable_arenas->nextarena;
+            if (mhcurr->usable_arenas != NULL) {
+                mhcurr->usable_arenas->prevarena = NULL;
+                assert(mhcurr->usable_arenas->address != 0);
             }
         }
     }
 
     /* Frontlink to used pools. */
     block *bp;
-    poolp next = mhd_state->usedpools[size + size]; /* == prev */
+    poolp next = mhcurr->usedpools[size + size]; /* == prev */
     pool->nextpool = next;
     pool->prevpool = next;
     next->nextpool = pool;
@@ -319,7 +319,7 @@ allocate_from_new_pool(uint size)
    or when the max memory limit has been reached.
 */
 static inline void*
-pymalloc_alloc(void *ctx, size_t nbytes)
+pymalloc_alloc(mh_state* mhcurr, void *ctx, size_t nbytes)
 {
 #ifdef WITH_VALGRIND
     if (UNLIKELY(running_on_valgrind == -1)) {
@@ -338,7 +338,7 @@ pymalloc_alloc(void *ctx, size_t nbytes)
     }
 
     uint size = (uint)(nbytes - 1) >> ALIGNMENT_SHIFT;
-    poolp pool = mhd_state->usedpools[size + size];
+    poolp pool = mhcurr->usedpools[size + size];
     block *bp;
 
     if (LIKELY(pool != pool->nextpool)) {
@@ -359,7 +359,7 @@ pymalloc_alloc(void *ctx, size_t nbytes)
         /* There isn't a pool of the right size class immediately
          * available:  use a free pool.
          */
-        bp = allocate_from_new_pool(size);
+        bp = allocate_from_new_pool(mhcurr, size);
     }
 
     return (void *)bp;
@@ -368,7 +368,7 @@ pymalloc_alloc(void *ctx, size_t nbytes)
 void *
 _Extrn_Malloc(void *ctx, size_t nbytes)
 {
-    void* ptr = pymalloc_alloc(ctx, nbytes);
+    void* ptr = pymalloc_alloc(mhd_state, ctx, nbytes);
     if (LIKELY(ptr != NULL)) {
         return ptr;
     }
@@ -385,7 +385,7 @@ void *_Extrn_Calloc(void *ctx, size_t nelem, size_t elsize)
     assert(elsize == 0 || nelem <= (size_t)PY_SSIZE_T_MAX / elsize);
     size_t nbytes = nelem * elsize;
 
-    void* ptr = pymalloc_alloc(ctx, nbytes);
+    void* ptr = pymalloc_alloc(mhd_state, ctx, nbytes);
     if (LIKELY(ptr != NULL)) {
         memset(ptr, 0, nbytes);
         return ptr;
@@ -399,12 +399,12 @@ void *_Extrn_Calloc(void *ctx, size_t nelem, size_t elsize)
 }
 
 static void
-insert_to_usedpool(poolp pool)
+insert_to_usedpool(mh_state* mhcurr, poolp pool)
 {
     assert(pool->ref.count > 0);            /* else the pool is empty */
 
     uint size = pool->szidx;
-    poolp next = mhd_state->usedpools[size + size];
+    poolp next = mhcurr->usedpools[size + size];
     poolp prev = next->prevpool;
 
     /* insert pool before next:   prev <-> pool <-> next */
@@ -415,7 +415,7 @@ insert_to_usedpool(poolp pool)
 }
 
 static void
-insert_to_freepool(poolp pool)
+insert_to_freepool(mh_state* mhcurr, poolp pool)
 {
     poolp next = pool->nextpool;
     poolp prev = pool->prevpool;
@@ -425,15 +425,15 @@ insert_to_freepool(poolp pool)
     /* Link the pool to freepools.  This is a singly-linked
      * list, and pool->prevpool isn't used there.
      */
-    struct arena_object *ao = &(mhd_state->arenas[pool->arenaindex]);
+    struct arena_object *ao = &(mhcurr->arenas[pool->arenaindex]);
     pool->nextpool = ao->freepools;
     ao->freepools = pool;
     uint nf = ao->nfreepools;
     /* If this is the rightmost arena with this number of free pools,
-     * mhd_state->nfp2lasta[nf] needs to change.  Caution:  if nf is 0, there
-     * are no arenas in mhd_state->usable_arenas with that value.
+     * mhcurr->nfp2lasta[nf] needs to change.  Caution:  if nf is 0, there
+     * are no arenas in mhcurr->usable_arenas with that value.
      */
-    struct arena_object* lastnf = mhd_state->nfp2lasta[nf];
+    struct arena_object* lastnf = mhcurr->nfp2lasta[nf];
     assert((nf == 0 && lastnf == NULL) ||
            (nf > 0 &&
             lastnf != NULL &&
@@ -442,7 +442,7 @@ insert_to_freepool(poolp pool)
              nf < lastnf->nextarena->nfreepools)));
     if (lastnf == ao) {  /* it is the rightmost */
         struct arena_object* p = ao->prevarena;
-        mhd_state->nfp2lasta[nf] = (p != NULL && p->nfreepools == nf) ? p : NULL;
+        mhcurr->nfp2lasta[nf] = (p != NULL && p->nfreepools == nf) ? p : NULL;
     }
     ao->nfreepools = ++nf;
 
@@ -456,15 +456,15 @@ insert_to_freepool(poolp pool)
      *    otherwise provoke needing to allocate and free an
      *    arena on every iteration.  See bpo-37257.
      * 2. If this is the only free pool in the arena,
-     *    add the arena back to the `mhd_state->usable_arenas` list.
+     *    add the arena back to the `mhcurr->usable_arenas` list.
      * 3. If the "next" arena has a smaller count of free
      *    pools, we have to "slide this arena right" to
-     *    restore that mhd_state->usable_arenas is sorted in order of
+     *    restore that mhcurr->usable_arenas is sorted in order of
      *    nfreepools.
      * 4. Else there's nothing more to do.
      */
     if (nf == ao->ntotalpools && ao->nextarena != NULL) {
-        /* Case 1.  First unlink ao from mhd_state->usable_arenas.
+        /* Case 1.  First unlink ao from mhcurr->usable_arenas.
          */
         assert(ao->prevarena == NULL ||
                ao->prevarena->address != 0);
@@ -472,12 +472,12 @@ insert_to_freepool(poolp pool)
                ao->nextarena->address != 0);
 
         /* Fix the pointer in the prevarena, or the
-         * mhd_state->usable_arenas pointer.
+         * mhcurr->usable_arenas pointer.
          */
         if (ao->prevarena == NULL) {
-            mhd_state->usable_arenas = ao->nextarena;
-            assert(mhd_state->usable_arenas == NULL ||
-                   mhd_state->usable_arenas->address != 0);
+            mhcurr->usable_arenas = ao->nextarena;
+            assert(mhcurr->usable_arenas == NULL ||
+                   mhcurr->usable_arenas->address != 0);
         }
         else {
             assert(ao->prevarena->nextarena == ao);
@@ -493,32 +493,32 @@ insert_to_freepool(poolp pool)
         /* Record that this arena_object slot is
          * available to be reused.
          */
-        ao->nextarena = mhd_state->unused_arena_objects;
-        mhd_state->unused_arena_objects = ao;
+        ao->nextarena = mhcurr->unused_arena_objects;
+        mhcurr->unused_arena_objects = ao;
 
         /* Free the entire arena. */
         _PyObject_Arena.free(_PyObject_Arena.ctx,
                              (void *)ao->address, ARENA_SIZE);
         ao->address = 0;                        /* mark unassociated */
-        --(mhd_state->narenas_currently_allocated);
+        --(mhcurr->narenas_currently_allocated);
 
         return;
     }
 
     if (nf == 1) {
         /* Case 2.  Put ao at the head of
-         * mhd_state->usable_arenas.  Note that because
+         * mhcurr->usable_arenas.  Note that because
          * ao->nfreepools was 0 before, ao isn't
-         * currently on the mhd_state->usable_arenas list.
+         * currently on the mhcurr->usable_arenas list.
          */
-        ao->nextarena = mhd_state->usable_arenas;
+        ao->nextarena = mhcurr->usable_arenas;
         ao->prevarena = NULL;
-        if (mhd_state->usable_arenas)
-            mhd_state->usable_arenas->prevarena = ao;
-        mhd_state->usable_arenas = ao;
-        assert(mhd_state->usable_arenas->address != 0);
-        if (mhd_state->nfp2lasta[1] == NULL) {
-            mhd_state->nfp2lasta[1] = ao;
+        if (mhcurr->usable_arenas)
+            mhcurr->usable_arenas->prevarena = ao;
+        mhcurr->usable_arenas = ao;
+        assert(mhcurr->usable_arenas->address != 0);
+        if (mhcurr->nfp2lasta[1] == NULL) {
+            mhcurr->nfp2lasta[1] = ao;
         }
 
         return;
@@ -532,8 +532,8 @@ insert_to_freepool(poolp pool)
      * approach allowed a lot more memory to be freed.
      */
     /* If this is the only arena with nf, record that. */
-    if (mhd_state->nfp2lasta[nf] == NULL) {
-        mhd_state->nfp2lasta[nf] = ao;
+    if (mhcurr->nfp2lasta[nf] == NULL) {
+        mhcurr->nfp2lasta[nf] = ao;
     } /* else the rightmost with nf doesn't change */
     /* If this was the rightmost of the old size, it remains in place. */
     if (ao == lastnf) {
@@ -548,7 +548,7 @@ insert_to_freepool(poolp pool)
     /* Case 3:  We have to move the arena towards the end of the list,
      * because it has more free pools than the arena to its right.  It needs
      * to move to follow lastnf.
-     * First unlink ao from mhd_state->usable_arenas.
+     * First unlink ao from mhcurr->usable_arenas.
      */
     if (ao->prevarena != NULL) {
         /* ao isn't at the head of the list */
@@ -557,8 +557,8 @@ insert_to_freepool(poolp pool)
     }
     else {
         /* ao is at the head of the list */
-        assert(mhd_state->usable_arenas == ao);
-        mhd_state->usable_arenas = ao->nextarena;
+        assert(mhcurr->usable_arenas == ao);
+        mhcurr->usable_arenas = ao->nextarena;
     }
     ao->nextarena->prevarena = ao->prevarena;
     /* And insert after lastnf. */
@@ -572,7 +572,7 @@ insert_to_freepool(poolp pool)
     assert(ao->nextarena == NULL || nf <= ao->nextarena->nfreepools);
     assert(ao->prevarena == NULL || nf > ao->prevarena->nfreepools);
     assert(ao->nextarena == NULL || ao->nextarena->prevarena == ao);
-    assert((mhd_state->usable_arenas == ao && ao->prevarena == NULL)
+    assert((mhcurr->usable_arenas == ao && ao->prevarena == NULL)
            || ao->prevarena->nextarena == ao);
 }
 
@@ -580,7 +580,7 @@ insert_to_freepool(poolp pool)
    Return 1 if it was freed.
    Return 0 if the block was not allocated by pymalloc_alloc(). */
 static inline int
-pymalloc_free(void *ctx, void *p)
+pymalloc_free(mh_state* mhcurr, void *ctx, void *p)
 {
     assert(p != NULL);
 
@@ -591,7 +591,7 @@ pymalloc_free(void *ctx, void *p)
 #endif
 
     poolp pool = POOL_ADDR(p);
-    if (UNLIKELY(!address_in_range(p, pool))) {
+    if (UNLIKELY(!address_in_range(mhcurr, p, pool))) {
         return 0;
     }
     /* We allocated this address. */
@@ -615,7 +615,7 @@ pymalloc_free(void *ctx, void *p)
          * targets optimal filling when several pools contain
          * blocks of the same size class.
          */
-        insert_to_usedpool(pool);
+        insert_to_usedpool(mhcurr, pool);
         return 1;
     }
 
@@ -632,7 +632,7 @@ pymalloc_free(void *ctx, void *p)
      * previously freed pools will be allocated later
      * (being not referenced, they are perhaps paged out).
      */
-    insert_to_freepool(pool);
+    insert_to_freepool(mhcurr, pool);
     return 1;
 }
 
@@ -644,7 +644,7 @@ _Extrn_Free(void *ctx, void *p)
         return;
     }
 
-    if (UNLIKELY(!pymalloc_free(ctx, p))) {
+    if (UNLIKELY(!pymalloc_free(mhd_state, ctx, p))) {
         /* pymalloc didn't allocate this address */
         PyMem_RawFree(p);
         mhd_state->raw_allocated_blocks--;
@@ -661,7 +661,7 @@ _Extrn_Free(void *ctx, void *p)
 
    Return 0 if pymalloc didn't allocated p. */
 static int
-pymalloc_realloc(void *ctx, void **newptr_p, void *p, size_t nbytes)
+pymalloc_realloc(mh_state* mhcurr, void *ctx, void **newptr_p, void *p, size_t nbytes)
 {
     void *bp;
     poolp pool;
@@ -677,7 +677,7 @@ pymalloc_realloc(void *ctx, void **newptr_p, void *p, size_t nbytes)
 #endif
 
     pool = POOL_ADDR(p);
-    if (!address_in_range(p, pool)) {
+    if (!address_in_range(mhcurr, p, pool)) {
         /* pymalloc is not managing this block.
 
            If nbytes <= SMALL_REQUEST_THRESHOLD, it's tempting to try to take
@@ -729,7 +729,7 @@ _Extrn_Realloc(void *ctx, void *ptr, size_t nbytes)
         return _Extrn_Malloc(ctx, nbytes);
     }
 
-    if (pymalloc_realloc(ctx, &ptr2, ptr, nbytes)) {
+    if (pymalloc_realloc(mhd_state, ctx, &ptr2, ptr, nbytes)) {
         return ptr2;
     }
 
