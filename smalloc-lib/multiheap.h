@@ -23,7 +23,7 @@ extern "C" {
 /* The initial size for the mh_allocator array of mheaps. */
 #define MH_INITIAL_MHEAPS_NB 100
 #define MH_PAGE_SIZE 0x1000
-#define MH_DEFAULT_POOL_SIZE (100 * MH_PAGE_SIZE)
+#define MH_DEFAULT_POOL_SIZE (1 * MH_PAGE_SIZE)
 
 struct mh_heap;
 
@@ -32,6 +32,7 @@ typedef struct mh_arena {
   struct mh_arena* prev;      /* pointer to the prev mh_heap. */
   struct mh_arena* next;      /* pointer to the next mh_heap. */
   uint64_t num_elem;          /* number of elements allocated inside the arena. */
+  uint64_t used_bytes;        /* keep the number of allocated bytes, including headers */
   struct smalloc_pool pool;   /* memory pool from smalloc. */  
 } mh_arena;
 
@@ -68,6 +69,7 @@ int64_t mh_get_id(void* ptr);
 void mh_heap_init(int64_t id, struct mh_heap* heap);
 void *mh_heap_malloc(mh_heap* heap, size_t size);
 void mh_heap_free(mh_heap *heap, void *ptr);
+void mh_heap_mv_to_head(mh_heap* heap, mh_arena* arena);
 
 /* mh_arena functions */
 mh_arena* mh_new_arena(mh_heap* parent, size_t pool_size);

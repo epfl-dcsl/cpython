@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "multiheap.h" 
+#include "smalloc_i.h"
 
 /* Defined in tracemalloc.c */
 extern void _PyMem_DumpTraceback(int fd, const void *ptr);
@@ -14,6 +15,7 @@ extern void _PyMem_DumpTraceback(int fd, const void *ptr);
 #define uint    unsigned int    /* assuming >= 16 bits */
 
 #define MY_IMPL 1
+//#define MY_OBJ 1
 
 /* Forward declaration */
 static void* _PyMem_DebugRawMalloc(void *ctx, size_t size);
@@ -82,11 +84,6 @@ static void _PyObject_Free(void *ctx, void *p);
 static void* _PyObject_Realloc(void *ctx, void *ptr, size_t size);
 
 /* @aghosn Forward declaration for replacement allocators */
-//static void* _Pool_Malloc(void* ctx, size_t size);
-//static void* _Pool_Calloc(void *ctx, size_t nelem, size_t elsize);
-//static void _Pool_Free(void *ctx, void *p);
-//static void* _Pool_Realloc(void *ctx, void *ptr, size_t size);
-/* Replacement for Raw as well */
 static void* _Pool_RawMalloc(void* ctx, size_t size);
 static void* _Pool_RawCalloc(void *ctx, size_t nelem, size_t elsize);
 static void _Pool_RawFree(void *ctx, void *p);
@@ -124,7 +121,7 @@ _Pool_RawMalloc(void* ctx, size_t size)
   size += HEADER_SZ;
   void* res = _PyMem_RawMalloc(ctx, size);
   struct smalloc_hdr *shdr = (struct smalloc_hdr *)(res);
-  shdr->sm_magic = NOT_SM_MAGIC;
+  shdr->sm_magic = SM_NOT_MAGIC;
   return HEADER_TO_USER(shdr);
 #endif
 }
@@ -1744,7 +1741,7 @@ static void *
 _PyObject_Malloc(void *ctx, size_t nbytes)
 {
 
-#ifdef MY_IMPL
+#ifdef MY_OBJ
   int64_t id = PyObject_Get_Current_ModuleId();
   void *ptr = mh_malloc(id, nbytes);
   if (ptr == NULL) {
@@ -1773,7 +1770,7 @@ _PyObject_Calloc(void *ctx, size_t nelem, size_t elsize)
     assert(elsize == 0 || nelem <= (size_t)PY_SSIZE_T_MAX / elsize);
     size_t nbytes = nelem * elsize;
 
-#ifdef MY_IMPL
+#ifdef MY_OBJ
     int64_t id = PyObject_Get_Current_ModuleId();
     void* ptr = mh_malloc(id, nbytes);
     if (ptr == NULL) {
@@ -2040,7 +2037,7 @@ static void
 _PyObject_Free(void *ctx, void *p)
 {
 
-#ifdef MY_IMPL
+#ifdef MY_OBJ
   if (p == NULL) {
     return;
   }
@@ -2140,7 +2137,7 @@ pymalloc_realloc(void *ctx, void **newptr_p, void *p, size_t nbytes)
 static void *
 _PyObject_Realloc(void *ctx, void *ptr, size_t nbytes)
 {
-#ifdef MY_IMPL
+#ifdef MY_OBJ
     int64_t id = PyObject_Get_Current_ModuleId();
     if (ptr == NULL) {
       void *nptr = mh_malloc(id, nbytes);

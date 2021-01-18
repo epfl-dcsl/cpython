@@ -47,7 +47,46 @@ void mh_init_allocator() {
   }
 }
 
+// Optimize the way in which we go through the list,
+// Add the number of allocated bytes as an attribute of the pool.
+// Try to boost the speed of that shit.
+//#define REAL_ALLOC 1
 
+#ifdef REAL_ALLOC
+int64_t mh_new_id(const char* name) {
+  //Do nothing
+  return 0;
+} 
+
+void *mh_malloc(int64_t id, size_t size) {
+  if (size == 0)
+    size = 1;
+  return malloc(size);
+}
+
+void *mh_calloc(int64_t id, size_t nmemb, size_t size) {
+  if (nmemb == 0 || size == 0) {
+    nmemb = 1;
+    size = 1;
+  }
+  return calloc(nmemb, size);
+}
+
+void *mh_realloc(void* ptr, size_t size) {
+  if (size == 0) 
+    size = 1;
+  return realloc(ptr, size);
+}
+
+void mh_free(void* ptr) {
+  free(ptr);
+}
+
+int64_t mh_get_id(void* ptr) {
+  return 0;
+}
+  
+#else
 //TODO(aghosn) get the name of the pool later on.
 int64_t mh_new_id(const char* name) {
   int64_t id = mhallocator.next_id++;
@@ -122,6 +161,8 @@ int64_t mh_get_id(void* ptr) {
   return shdr->pool_id;
 }
 
+#endif //REAL_ALLOC
+
 /* All the functions that relate to mh_heap. */
 
 void mh_heap_init(int64_t id, struct mh_heap* heap) {
@@ -135,8 +176,16 @@ void mh_heap_init(int64_t id, struct mh_heap* heap) {
 void *mh_heap_malloc(mh_heap* heap, size_t size) {
   check_null(heap);
   for (mh_arena* arena = heap->lhead; arena != NULL; arena = arena->next) {
+    uint64_t free = arena->pool.pool_size - arena->used_bytes; 
+    /* Not enough space left here, it's stupid to even look. */
+    if (free < (size + HEADER_SZ)) {
+      continue;
+    }
     void* ptr = sm_malloc_pool(heap->pool_id, &arena->pool, size);
     if (ptr != NULL) {
+      struct smalloc_hdr* shdr = USER_TO_HEADER(ptr);
+      arena->num_elem++;
+      arena->used_bytes += shdr->rsz; 
       return ptr;
     }
   }
@@ -156,18 +205,46 @@ void mh_heap_free(mh_heap* heap, void* ptr) {
   check_null(heap);
   check_null(ptr);
   struct smalloc_hdr *shdr = USER_TO_HEADER(ptr);
+  size_t size = shdr->rsz;
   for (mh_arena* arena = heap->lhead; arena != NULL; arena = arena->next) {
     struct smalloc_pool* pool = &arena->pool;
     if (smalloc_is_alloc(pool, shdr)) {
       sm_free_pool(pool, ptr); 
       arena->num_elem--;
+      arena->used_bytes -= ((uint64_t) size);
       if (arena->num_elem == 0) {
-        //TODO(aghosn) maybe clean the arena if it's empty.
+        mh_heap_mv_to_head(heap, arena);
       }
       return;
     } 
   }
   check(0, "Unable to free");
+}
+
+void mh_heap_mv_to_head(mh_heap* heap, mh_arena* arena) {
+  // Nothing to do.
+  if (heap->lhead == arena) {
+    return;
+  }
+
+  mh_arena* prev = arena->prev;
+  mh_arena* next = arena->next;
+  if (prev != NULL) {
+    prev->next = next;
+  }
+  if (next != NULL) {
+    prev->prev = NULL;
+  }
+  if (heap->ltail == arena) {
+    if (next != NULL) {
+      heap->ltail = next;
+    } else if (prev != NULL) {
+      heap->ltail = prev;
+    } else {
+      fprintf(stderr, "There is someting really wrong\n");
+      exit(33);
+    }
+  }
 }
 
 /* All the functions that relate to mh_arena */
@@ -182,6 +259,7 @@ mh_arena* mh_new_arena(mh_heap* parent, size_t pool_size) {
   arena->prev = NULL;
   arena->next = NULL;
   arena->num_elem = 0;
+  arena->used_bytes = 0;
   arena->pool.pool_size = pool_size;
   arena->pool.pool = mmap(NULL, pool_size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); 
   check_null(arena->pool.pool);
@@ -193,10 +271,11 @@ mh_arena* mh_new_arena(mh_heap* parent, size_t pool_size) {
     parent->lhead = arena;
     parent->ltail = arena;
   } else {
-    mh_arena* prev = parent->ltail;
-    parent->ltail = arena;
-    arena->prev = prev;
-    prev->next = arena;
+    // Cheat, put it in front
+    mh_arena* head = parent->lhead;
+    parent->lhead = arena;
+    arena->next = head;
+    head->prev = arena;
   }
   parent->lsize++;
 

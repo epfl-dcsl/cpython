@@ -3,6 +3,8 @@
  * SMalloc is MIT licensed.
  * Copyright (c) 2017 Andrey Rys.
  */
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "smalloc_i.h"
 
@@ -13,6 +15,8 @@ void sm_free_pool(struct smalloc_pool *spool, void *p)
 
 	if (!smalloc_verify_pool(spool)) {
 		errno = EINVAL;
+    fprintf(stderr, "Unable to free!\n");
+    exit(33);
 		return;
 	}
 

@@ -94,9 +94,7 @@ PyModule_NewObject(PyObject *name)
         fprintf(stderr, "module-object: error while adding a new pool\n");
         exit(33);
     }
-    //SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
     m = PyObject_GC_New(PyModuleObject, &PyModule_Type);
-    //m = PyObject_GC_NewFromPool(PyModuleObject, &PyModule_Type, id);
 
     if (m == NULL)
         return NULL;
@@ -108,7 +106,8 @@ PyModule_NewObject(PyObject *name)
     m->md_id = id; // ADDED THIS (aghosn) remove this
     assert(name != NULL && PyUnicode_Check(name));
     //(aghosn) Registration done here allows to keep names as well.
-    SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
+    //TODO(aghosn) redo that.
+    //SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
     if (module_init_dict(m, m->md_dict, name, NULL) != 0)
         goto fail;
     PyObject_GC_Track(m);

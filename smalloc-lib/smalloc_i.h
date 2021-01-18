@@ -21,7 +21,7 @@ struct smalloc_hdr {
 };
 
 #define SM_MAGIC ((uint32_t) 0xdeadbeef) 
-#define SM_NOT_MAGIC ((uint32) 0xdeadbabe)
+#define SM_NOT_MAGIC ((uint32_t) 0xdeadbabe)
 #define HEADER_SZ (sizeof(struct smalloc_hdr))
 #define MIN_POOL_SZ (HEADER_SZ*20)
 
