@@ -384,7 +384,8 @@ _Extrn_Malloc(void *ctx, size_t nbytes)
     void* ptr = pymalloc_alloc(mhd_state, ctx, nbytes);
     if (LIKELY(ptr != NULL)) {
         mh_header* shdr = HEADER_PTR(ptr);
-        shdr->pool_id = MH_MAGIC; 
+        shdr->pool_id = mhd_state->pool_id; 
+        shdr->mh_magic = MH_MAGIC; 
         return HEADER_TO_USER(shdr);
     }
 
@@ -392,7 +393,8 @@ _Extrn_Malloc(void *ctx, size_t nbytes)
     if (ptr != NULL) {
         mhd_state->raw_allocated_blocks++;
         mh_header* shdr = HEADER_PTR(ptr);
-        shdr->pool_id = MH_NOT_MAGIC;
+        shdr->pool_id = mhd_state->pool_id;
+        shdr->mh_magic = MH_NOT_MAGIC;
         return HEADER_TO_USER(shdr);
     }
     return NULL;
@@ -408,7 +410,8 @@ void *_Extrn_Calloc(void *ctx, size_t nelem, size_t elsize)
     if (LIKELY(ptr != NULL)) {
         memset(ptr, 0, nbytes);
         mh_header *shdr = HEADER_PTR(ptr);
-        shdr->pool_id = MH_MAGIC; 
+        shdr->pool_id = mhd_state->pool_id;
+        shdr->mh_magic = MH_MAGIC; 
         return HEADER_TO_USER(shdr);
     }
 
@@ -417,7 +420,8 @@ void *_Extrn_Calloc(void *ctx, size_t nelem, size_t elsize)
     if (ptr != NULL) {
         mhd_state->raw_allocated_blocks++;
         mh_header* shdr = HEADER_PTR(ptr);
-        shdr->pool_id = MH_NOT_MAGIC;
+        shdr->pool_id = mhd_state->pool_id;
+        shdr->mh_magic = MH_NOT_MAGIC;
         return HEADER_TO_USER(shdr);
     }
     return ptr;
@@ -682,7 +686,7 @@ _Extrn_Free(void *ctx, void *p)
     }
     mh_state* mhd_state = mh_heaps_get_curr_heap();
     mh_header* shdr = USER_TO_HEADER(p); 
-    assert(shdr->pool_id == MH_MAGIC || shdr->pool_id == MH_NOT_MAGIC); 
+    assert(shdr->mh_magic == MH_MAGIC || shdr->mh_magic == MH_NOT_MAGIC); 
     p = VOID_PTR(shdr);
     if (UNLIKELY(!pymalloc_free(mhd_state, ctx, p))) {
         /* pymalloc didn't allocate this address */
@@ -774,12 +778,14 @@ _Extrn_Realloc(void *ctx, void *ptr, size_t nbytes)
     nbytes += HEADER_SZ;
     if (pymalloc_realloc(mhd_state, ctx, &ptr2, ptr, nbytes)) {
         mh_header* shdr = HEADER_PTR(ptr2);
-        shdr->pool_id = MH_MAGIC;
+        shdr->pool_id = mhd_state->pool_id;
+        shdr->mh_magic = MH_MAGIC;
         return HEADER_TO_USER(shdr);
     }
 
     ptr2 = PyMem_RawRealloc(ptr, nbytes);
     mh_header* shdr = HEADER_PTR(ptr2);
-    shdr->pool_id = MH_NOT_MAGIC;
+    shdr->pool_id = mhd_state->pool_id;
+    shdr->mh_magic = MH_NOT_MAGIC;
     return HEADER_TO_USER(shdr);
 }

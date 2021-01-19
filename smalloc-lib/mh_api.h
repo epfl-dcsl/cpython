@@ -4,6 +4,7 @@
 #include "mh_state.h"
 
 typedef struct mh_header {
+  uint32_t mh_magic;
   int64_t pool_id;
 } mh_header;
 
@@ -12,6 +13,15 @@ typedef struct mh_heaps {
   int64_t gen_id;
   size_t curr_size;
 } mh_heaps;
+
+typedef struct mh_stack_ids {
+  int64_t* stack;
+  size_t head;
+  size_t size;
+} mh_stack_ids;
+
+#define MH_STACK_INIT_SZ 20
+#define MH_STACK_GROWTH_FACTOR 2
 
 #define MH_HEAPS_INIT_SZ 20
 #define MH_HEAPS_GROWTH_FACTOR 2
@@ -35,7 +45,15 @@ void mh_heaps_init();
 mh_state* mh_heaps_get_curr_heap();
 mh_state* mh_heaps_get_heap(int64_t id);
 
+/* mh_stack functions */
+void mh_stack_push(int64_t id);
+int64_t mh_stack_peek();
+int64_t mh_stack_pop();
+
+/* Getting the id from a pointer. */
+int64_t mh_get_id(void* ptr);
+
 /* mh_state functions */
-mh_state* mh_new_state(const char* name);
+int64_t mh_new_state(const char* name);
 
 #endif

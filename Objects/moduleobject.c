@@ -673,11 +673,6 @@ static int
 module___init___impl(PyModuleObject *self, PyObject *name, PyObject *doc)
 /*[clinic end generated code: output=e7e721c26ce7aad7 input=57f9e177401e5e1e]*/
 {
-    int64_t id = 0; //mh_new_id(PyUnicode_AsUTF8(name));
-    if (id < 0) {
-      fprintf(stderr, "Could not register the module :(\n");
-      exit(33);
-    }
     //SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
 
     PyObject *dict = self->md_dict;

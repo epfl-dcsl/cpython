@@ -32,8 +32,10 @@
 
 #include <ctype.h>
 
-//#include "multiheap.h"
+#include "mh_api.h"
 #include "liblitterbox.h"
+
+#include "pycore_gc.h"
 
 #ifdef Py_DEBUG
 /* For debugging the interpreter: */
@@ -4969,26 +4971,33 @@ PyEval_GetGlobals(void)
     return current_frame->f_globals;
 }
 
-#define MY_IMPL 1
-
 /**
  * Returns the current module id.
  * If it cannot be found, return 0, the default id.
  */
 int64_t PyObject_Get_Current_ModuleId() {
-#ifdef MY_IMPL
-  // Because for the moment there is no guarantee we control the alloc.
-  return 0;
-#else
   _Py_IDENTIFIER(__name__);
-  PyObject* globals = PyEval_GetGlobals();
+  PyThreadState *tstate = _PyThreadState_GET();
+  if (tstate == NULL) {
+    return 0;
+  }
+  PyFrameObject *current_frame = tstate->frame;
+  if (current_frame == NULL) {
+      return 0;
+  }
+  PyObject* globals = current_frame->f_globals;
   if (globals == NULL) {
     return 0;
   }
+  // This is the necessary because it will do an allocation.
+  mh_stack_push(0);
   PyObject* name = _PyDict_GetItemIdWithError(globals, &PyId___name__);
   if (name == NULL) {
+    assert(mh_stack_pop() = 0);
     return 0;
   }
+  assert(mh_stack_pop() == 0);
+
   PyObject* myMod = PyImport_GetModule(name);
   if (myMod == NULL) {
     return 0;
@@ -4997,14 +5006,9 @@ int64_t PyObject_Get_Current_ModuleId() {
     fprintf(stderr, "We got a module that is not a module!\n");
     exit(33);
   }
- // int64_t id = mh_get_id(myMod);
- // if (id < 0 ) {
- //   fprintf(stderr, "The module is not allocated by us\n");
- //   return 0;
- // }
- // return id;
- return 0;
-#endif
+  // we need to cast it because otherwise we are offsetted.
+  PyGC_Head *g = _Py_AS_GC(myMod);
+  return mh_get_id((void*)g);
 }
 
 int
