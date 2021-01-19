@@ -19,7 +19,7 @@ main(int argc, char **argv)
     int ret;
     /*(aghosn) init the dynamic backend, reads the env-var from go.*/
     SB_Initialize();
-    mhd_state = mh_new_state("mh_default");
+    mh_heaps_init(); 
    // register_id = &SB_RegisterPackageId; 
    // register_growth = &SB_AddSection;
    // mh_init_allocator();
