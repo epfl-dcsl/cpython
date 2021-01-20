@@ -67,10 +67,11 @@ int64_t mh_new_state(const char* name) {
   state->maxarenas = 0;
   state->unused_arena_objects = NULL;
   state->usable_arenas = NULL;
-  memset(state->nfp2lasta, 0, sizeof(struct arena_object*) * MAX_POOLS_IN_ARENA+1);
+  memset(state->nfp2lasta, 0, sizeof(struct arena_object*) * (MAX_POOLS_IN_ARENA+1));
   state->narenas_currently_allocated = 0;
   state->ntimes_arena_allocated = 0;
   state->narenas_highwater = 0;
+  state->raw_allocated_blocks = 0;
   return state->pool_id;
 }
 

@@ -6,7 +6,7 @@
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
 #include "structmember.h"         // PyMemberDef
 
-//#include "multiheap.h" 
+#include "mh_api.h"
 #include "liblitterbox.h"
 
 static Py_ssize_t max_module_number;
@@ -89,12 +89,12 @@ PyModule_NewObject(PyObject *name)
 {
     PyModuleObject *m;
     // (elsa) ADDED THIS
-    int64_t id = 0; //mh_new_id(PyUnicode_AsUTF8(name));
-    if (id < 0) {
-        fprintf(stderr, "module-object: error while adding a new pool\n");
-        exit(33);
-    }
+    mh_stack_push(0);
+    int64_t id = mh_new_state(PyUnicode_AsUTF8(name));
+    assert(mh_stack_pop() != id);
+    mh_stack_push(id);
     m = PyObject_GC_New(PyModuleObject, &PyModule_Type);
+    assert(m != NULL && mh_stack_pop() == id);
 
     if (m == NULL)
         return NULL;
