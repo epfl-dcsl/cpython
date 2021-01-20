@@ -75,8 +75,6 @@ extern void SB_Prolog(char* p0);
 
 extern void SB_Epilog(char* p0);
 
-extern void SB_RegisterRegion(char* p0, int p1, void* p2, size_t p3);
-
 extern void SB_RegisterDependency(char* p0, char* p1);
 
 extern void SB_RegisterPackageId(char* p0, int p1);

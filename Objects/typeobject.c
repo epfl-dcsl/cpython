@@ -1045,18 +1045,12 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
     const size_t size = _PyObject_VAR_SIZE(type, nitems+1);
     /* note that we need to add one, for the sentinel */
     if (_PyType_IS_GC(type)) {
-      // aghosn
-      // SB_Register
        if (type == &PyModule_Type) {
-         // This will have to do for now.
+         // @aghosn make sure its allocations are tracked.
          int64_t id = mh_new_state(type->tp_name);
          mh_stack_push(id);
        } 
         obj = _PyObject_GC_Malloc(size);
-      if (type == &PyModule_Type) {
-        // pop it up now.
-        mh_stack_pop();
-      }
     }
     else {
         obj = (PyObject *)PyObject_MALLOC(size);
@@ -1077,6 +1071,10 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
 
     if (_PyType_IS_GC(type)) {
         _PyObject_GC_TRACK(obj);
+    }
+    if (type == &PyModule_Type) {
+        // @aghosn pop it up now.
+        mh_stack_pop();
     }
     return obj;
 }

@@ -33,10 +33,6 @@ void mh_heaps_init() {
   stack.stack = calloc(MH_STACK_INIT_SZ, sizeof(int64_t));
   stack.head = 0;
   stack.size = MH_STACK_INIT_SZ;
-  /* Call LitterBox backend. */
-  if (register_id != NULL) {
-    register_id("mhdefault", id);
-  }
 }
 
 mh_state* mh_heaps_get_curr_heap() {

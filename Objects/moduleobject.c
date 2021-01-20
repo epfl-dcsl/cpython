@@ -8,6 +8,7 @@
 
 #include "mh_api.h"
 #include "liblitterbox.h"
+#include "pycore_gc.h"
 
 static Py_ssize_t max_module_number;
 
@@ -88,16 +89,17 @@ PyObject *
 PyModule_NewObject(PyObject *name)
 {
     PyModuleObject *m;
-    // (elsa) ADDED THIS
     mh_stack_push(0);
     int64_t id = mh_new_state(PyUnicode_AsUTF8(name));
+    assert(id != mh_stack_pop());
     assert(mh_stack_pop() != id);
     mh_stack_push(id);
     m = PyObject_GC_New(PyModuleObject, &PyModule_Type);
-    assert(m != NULL && mh_stack_pop() == id);
 
-    if (m == NULL)
+    if (m == NULL) {
+        mh_stack_pop();
         return NULL;
+    }
     m->md_def = NULL;
     m->md_state = NULL;
     m->md_weaklist = NULL;
@@ -111,10 +113,12 @@ PyModule_NewObject(PyObject *name)
     if (module_init_dict(m, m->md_dict, name, NULL) != 0)
         goto fail;
     PyObject_GC_Track(m);
+    assert(mh_stack_pop() == id);
     return (PyObject *)m;
 
  fail:
     Py_DECREF(m);
+    assert(mh_stack_pop() == id);
     return NULL;
 }
 
@@ -673,18 +677,26 @@ static int
 module___init___impl(PyModuleObject *self, PyObject *name, PyObject *doc)
 /*[clinic end generated code: output=e7e721c26ce7aad7 input=57f9e177401e5e1e]*/
 {
-    //SB_RegisterPackageId(PyUnicode_AsUTF8(name), id);
-
+    PyGC_Head *g = _Py_AS_GC(self);
+    int64_t id = mh_get_id(g);
+    mh_stack_push(id);
+    register_id(PyUnicode_AsUTF8(name), id);
+    // This should be initialized carefully.
     PyObject *dict = self->md_dict;
     if (dict == NULL) {
         dict = PyDict_New();
-        if (dict == NULL)
+        if (dict == NULL) {
+            assert(id == mh_stack_pop());
             return -1;
+        }
         self->md_dict = dict;
     }
-    if (module_init_dict(self, dict, name, doc) < 0)
-        return -1;
 
+    if (module_init_dict(self, dict, name, doc) < 0) {
+        assert(id == mh_stack_pop());
+        return -1;
+    }
+    assert(id == mh_stack_pop());
     return 0;
 }
 
