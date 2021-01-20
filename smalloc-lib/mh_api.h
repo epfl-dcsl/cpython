@@ -56,4 +56,8 @@ int64_t mh_get_id(void* ptr);
 /* mh_state functions */
 int64_t mh_new_state(const char* name);
 
+/* Hooks for LitterBox callbacks. */
+extern void (*register_id)(const char*, int);
+extern void (*register_growth)(int, void*, size_t);
+
 #endif

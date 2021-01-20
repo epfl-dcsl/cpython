@@ -10,6 +10,11 @@
 /* This function will allow us to get the current module id or 0, the default.*/
 extern int64_t PyObject_Get_Current_ModuleId(void); 
 
+/* Hooks for LitterBox. */
+void (*register_id)(const char*, int) = NULL;
+void (*register_growth)(int, void*, size_t) = NULL;
+
+/* Local globals (lol). */
 static void mh_grow_mh_heaps();
 
 static mh_stack_ids stack;
@@ -28,6 +33,10 @@ void mh_heaps_init() {
   stack.stack = calloc(MH_STACK_INIT_SZ, sizeof(int64_t));
   stack.head = 0;
   stack.size = MH_STACK_INIT_SZ;
+  /* Call LitterBox backend. */
+  if (register_id != NULL) {
+    register_id("mhdefault", id);
+  }
 }
 
 mh_state* mh_heaps_get_curr_heap() {
@@ -72,6 +81,10 @@ int64_t mh_new_state(const char* name) {
   state->ntimes_arena_allocated = 0;
   state->narenas_highwater = 0;
   state->raw_allocated_blocks = 0;
+  /* Call the LitterBox backend. */
+  if (register_id != NULL) {
+    register_id(name, state->pool_id);
+  }
   return state->pool_id;
 }
 

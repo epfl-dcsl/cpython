@@ -11,7 +11,7 @@
 
 #include <ctype.h>
 
-//#include "multiheap.h" 
+#include "mh_api.h"
 
 /*[clinic input]
 class type "PyTypeObject *" "&PyType_Type"
@@ -1044,17 +1044,19 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
     PyObject *obj;
     const size_t size = _PyObject_VAR_SIZE(type, nitems+1);
     /* note that we need to add one, for the sentinel */
-    int64_t id;
-
     if (_PyType_IS_GC(type)) {
-       // if (type == &PyModule_Type) {
-       //   id = mh_new_id(type->tp_name);
-       //   if (id < 0) {
-       //     fprintf(stderr, "Failed to allocate a pool\n");
-       //     exit(33);
-       //   }
-       // } 
+      // aghosn
+      // SB_Register
+       if (type == &PyModule_Type) {
+         // This will have to do for now.
+         int64_t id = mh_new_state(type->tp_name);
+         mh_stack_push(id);
+       } 
         obj = _PyObject_GC_Malloc(size);
+      if (type == &PyModule_Type) {
+        // pop it up now.
+        mh_stack_pop();
+      }
     }
     else {
         obj = (PyObject *)PyObject_MALLOC(size);

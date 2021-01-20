@@ -30,7 +30,11 @@ _PyObject_ArenaMmap(void *ctx, size_t size)
     if (ptr == MAP_FAILED)
         return NULL;
     assert(ptr != NULL);
-    //TODO(aghosn) catch the mmap.
+    //Catch the mmap and register the result.
+    if (register_growth != NULL) {
+      int64_t id = mh_stack_peek();
+      register_growth(id, ptr, size);
+    }
     return ptr;
 }
 
@@ -109,7 +113,10 @@ new_arena(mh_state* mhcurr)
     arenaobj = mhcurr->unused_arena_objects;
     mhcurr->unused_arena_objects = arenaobj->nextarena;
     assert(arenaobj->address == 0);
+    /* Push the pool_id before the call so we get access to it in mmap. */
+    mh_stack_push(mhcurr->pool_id);
     address = _PyObject_Arena.alloc(_PyObject_Arena.ctx, ARENA_SIZE);
+    assert(address != NULL && (mhcurr->pool_id == mh_stack_pop()));
     if (address == NULL) {
         /* The allocation failed: return NULL after putting the
          * arenaobj back.

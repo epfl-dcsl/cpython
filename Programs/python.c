@@ -19,10 +19,9 @@ main(int argc, char **argv)
     int ret;
     /*(aghosn) init the dynamic backend, reads the env-var from go.*/
     SB_Initialize();
+    register_id = &SB_RegisterPackageId; 
+    register_growth = &SB_AddSection;
     mh_heaps_init(); 
-   // register_id = &SB_RegisterPackageId; 
-   // register_growth = &SB_AddSection;
-   // mh_init_allocator();
     ret = Py_BytesMain(argc, argv);
     return ret;
 }
