@@ -90,7 +90,8 @@ PyModule_NewObject(PyObject *name)
 {
     PyModuleObject *m;
     mh_stack_push(0);
-    int64_t id = mh_new_state(PyUnicode_AsUTF8(name));
+    const char* cname = PyUnicode_AsUTF8(name);
+    int64_t id = mh_new_state(cname);
     assert(id != mh_stack_pop());
     assert(mh_stack_pop() != id);
     mh_stack_push(id);
@@ -680,7 +681,8 @@ module___init___impl(PyModuleObject *self, PyObject *name, PyObject *doc)
     PyGC_Head *g = _Py_AS_GC(self);
     int64_t id = mh_get_id(g);
     mh_stack_push(id);
-    register_id(PyUnicode_AsUTF8(name), id);
+    const char* cname = PyUnicode_AsUTF8(name); 
+    register_id(cname, id);
     // This should be initialized carefully.
     PyObject *dict = self->md_dict;
     if (dict == NULL) {
