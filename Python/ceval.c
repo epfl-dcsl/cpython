@@ -3414,16 +3414,16 @@ main_loop:
             const char *sid = PyUnicode_AsUTF8(id_str);
 
             if (oparg) {
-                PyObject *sys = POP();
-                PyObject *mem = POP();
+                //PyObject *sys = POP();
+                //PyObject *mem = POP();
                 PyObject *dep = PyDict_GetItemWithError(sandboxes, uid);
                 if (dep == NULL) {
                     fprintf(stderr, "Could not find dependency for sandbox\n");
                     exit(1);
                 }
                 // Let's register the sandbox.
-                SB_RegisterSandbox((char*)sid,(char*)PyUnicode_AsUTF8(mem),
-                    (char*)PyUnicode_AsUTF8(sys));
+                SB_RegisterSandbox((char*)sid,"", ""/*(char*)PyUnicode_AsUTF8(mem),
+                    (char*)PyUnicode_AsUTF8(sys)*/);
                 SB_Prolog((char*)sid);
             } else {
                 SB_Epilog((char*)sid);

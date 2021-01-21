@@ -5038,21 +5038,22 @@ compiler_sandbox(struct compiler *c, stmt_ty s)
     }
 
     /* Load sandbox arguments on the stack */
-    ADDOP_LOAD_CONST(c, s->v.Sandbox.mem);
-    ADDOP_LOAD_CONST(c, s->v.Sandbox.sys);
-    ADDOP_LOAD_CONST(c, s->v.Sandbox.uid);
+    //fprintf(stderr, "ALLEZ LA %s\n", PyUnicode_AsUTF8(s->v.Sandbox.mem));
+    //ADDOP_LOAD_CONST(c, s->v.Sandbox.mem);
+    //ADDOP_LOAD_CONST(c, s->v.Sandbox.sys);
+    //ADDOP_LOAD_CONST(c, s->v.Sandbox.uid);
 
     ADDOP_I(c, SETUP_SANDBOX, 1);
 
     compiler_use_next_block(c, block);
 
-    c->c_current_sb_id = s->v.Sandbox.uid;
+    c->c_current_sb_id = 0;//s->v.Sandbox.uid;
     PyObject_SetItem(c->c_sb_cache, c->c_current_sb_id, PySet_New(NULL)); 
 
     /* BLOCK code */
     VISIT_SEQ(c, stmt, s->v.Sandbox.body); 
 
-    ADDOP_LOAD_CONST(c, s->v.Sandbox.uid);
+    //ADDOP_LOAD_CONST(c, s->v.Sandbox.uid);
     ADDOP_I(c, SETUP_SANDBOX, 0);
     c->c_current_sb_id = NULL;
 

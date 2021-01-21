@@ -79,6 +79,7 @@ compound_stmt[stmt_ty]:
     | &('for' | ASYNC) for_stmt
     | &'try' try_stmt
     | &'while' while_stmt
+    | &'sandbox' sandbox_stmt
 
 # NOTE: annotated_rhs may start with 'yield'; yield_expr must start with 'yield'
 assignment[stmt_ty]:
@@ -164,6 +165,9 @@ else_block[asdl_seq*]: 'else' ':' b=block { b }
 
 while_stmt[stmt_ty]:
     | 'while' a=named_expression ':' b=block c=[else_block] { _Py_While(a, b, c, EXTRA) }
+
+sandbox_stmt[stmt_ty]:
+    | 'sandbox' '(' a=STRING ',' b=STRING ')' ':' c=block { _Py_Sandbox(a, b, c, EXTRA) } 
 
 for_stmt[stmt_ty]:
     | 'for' t=star_targets 'in' ~ ex=star_expressions ':' tc=[TYPE_COMMENT] b=block el=[else_block] {

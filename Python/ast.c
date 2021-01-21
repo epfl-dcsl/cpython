@@ -4540,7 +4540,7 @@ ast_for_sandbox(struct compiling *c, const node *n)
         return NULL;
     get_last_end_pos(body, &end_lineno, &end_col_offset);
 
-    return Sandbox(id, mem, sys, body, LINENO(n), n->n_col_offset, 
+    return Sandbox(mem, sys, body, LINENO(n), n->n_col_offset, 
               end_lineno, end_col_offset, c->c_arena);
 }
 
