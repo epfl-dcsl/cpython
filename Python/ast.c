@@ -4497,29 +4497,12 @@ quick_decode_string(const char *s, struct compiling *c)
     return res;
 }
 
-static PyObject*
-sandbox_generate_id(struct compiling *c) {
-    PyObject *id;
-
-    id = PyLong_FromLong(c->c_sandbox_id_counter);
-    if (id == NULL) {
-        return NULL;
-    }
-
-    if (PyArena_AddPyObject(c->c_arena, id) < 0) {
-        Py_DECREF(id);
-        return NULL;
-    }
-    c->c_sandbox_id_counter += 1;
-    return id;
-}
-
 static stmt_ty
 ast_for_sandbox(struct compiling *c, const node *n)
 {
    int end_lineno, end_col_offset;
     asdl_seq *body;
-    constant id;
+    //constant id;
     REQ(n, sandbox_stmt);
 
     /* Handle mem and sys strings */
@@ -4530,10 +4513,10 @@ ast_for_sandbox(struct compiling *c, const node *n)
     string mem = quick_decode_string(STR(n_mem), c);
     string sys = quick_decode_string(STR(n_sys), c);
    /* Generate id */
-    id = sandbox_generate_id(c);
-    if (id == NULL) {
-        return NULL;
-    }
+    //id = sandbox_generate_id(c);
+    //if (id == NULL) {
+    //    return NULL;
+   // }
 
     body = ast_for_suite(c, CHILD(n, NCH(n) - 1)); 
     if (!body)

@@ -236,6 +236,9 @@ static PyObject *__doc__, *__annotations__;
 
 static int add_sandbox_dependency(expr_ty e, struct compiler *c); /* ADDED THIS */
 
+/* Keep track of sandbox ids we generate. */
+static long sb_gen_id = 0;
+
 #define CAPSULE_NAME "compile.c compiler unit"
 
 PyObject *
@@ -5016,6 +5019,14 @@ compiler_with(struct compiler *c, stmt_ty s, int pos)
     return 1;
 }
 
+static PyObject*
+sandbox_generate_id(long val) {
+    PyObject *id;
+    id = PyLong_FromLong(val);
+    assert(id != NULL);
+    return id;
+}
+
 /* ADDED THIS */
 /* 
     sandbox:
@@ -5036,27 +5047,30 @@ compiler_sandbox(struct compiler *c, stmt_ty s)
     if (!block) {
         return 0;
     }
+    int id = sb_gen_id++;
+    PyObject* sb_id = PyObject_Str(sandbox_generate_id(id));
 
     /* Load sandbox arguments on the stack */
-    //fprintf(stderr, "ALLEZ LA %s\n", PyUnicode_AsUTF8(s->v.Sandbox.mem));
-    //ADDOP_LOAD_CONST(c, s->v.Sandbox.mem);
-    //ADDOP_LOAD_CONST(c, s->v.Sandbox.sys);
-    //ADDOP_LOAD_CONST(c, s->v.Sandbox.uid);
-
+    ADDOP_LOAD_CONST(c, s->v.Sandbox.mem->v.Constant.value);
+    ADDOP_LOAD_CONST(c, s->v.Sandbox.sys->v.Constant.value);
+    ADDOP_LOAD_CONST(c, sb_id);
+   
     ADDOP_I(c, SETUP_SANDBOX, 1);
-
+   
     compiler_use_next_block(c, block);
+   
+    c->c_current_sb_id = sb_id;
+    PyDict_SetItem(c->c_sb_cache, c->c_current_sb_id, PySet_New(NULL)); 
 
-    c->c_current_sb_id = 0;//s->v.Sandbox.uid;
-    PyObject_SetItem(c->c_sb_cache, c->c_current_sb_id, PySet_New(NULL)); 
+    // Make sure it's there
 
+  
     /* BLOCK code */
     VISIT_SEQ(c, stmt, s->v.Sandbox.body); 
-
-    //ADDOP_LOAD_CONST(c, s->v.Sandbox.uid);
+    
+    ADDOP_LOAD_CONST(c, sb_id);
     ADDOP_I(c, SETUP_SANDBOX, 0);
     c->c_current_sb_id = NULL;
-
     return 1;
 }
 
@@ -5068,15 +5082,11 @@ add_sandbox_dependency(expr_ty e, struct compiler *c)
         if (e->kind == Attribute_kind 
                 && e->v.Attribute.value->kind == Name_kind) {
             assert(PyDict_CheckExact(c->c_sb_cache));
-            dep_set = PyDict_GetItemWithError(c->c_sb_cache, c->c_current_sb_id);
-            if (dep_set != NULL) {
-                assert(PySet_Check(dep_set));
-                PySet_Add(dep_set, e->v.Attribute.value->v.Name.id); 
-                long id = PyLong_AsLong(c->c_current_sb_id);
-                char* dep = (char*) PyUnicode_AsUTF8(e->v.Attribute.value->v.Name.id);
-                SB_RegisterSandboxDependency(id, dep);
-                return 1;
-            }
+
+            /* @aghosn added this and commented what is below. */
+            long id = PyLong_AsLong(c->c_current_sb_id);
+            char* dep = (char*) PyUnicode_AsUTF8(e->v.Attribute.value->v.Name.id);
+            SB_RegisterSandboxDependency(id, dep);
         }
     }
     return 0;

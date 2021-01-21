@@ -1375,13 +1375,13 @@ static const arc arcs_48_1[1] = {
     {5, 2},
 };
 static const arc arcs_48_2[1] = {
-    {43, 3},
+    {128, 3},
 };
 static const arc arcs_48_3[1] = {
     {66, 4},
 };
 static const arc arcs_48_4[1] = {
-    {43, 5},
+    {128, 5},
 };
 static const arc arcs_48_5[1] = {
     {62, 6},

@@ -3406,27 +3406,20 @@ main_loop:
         
         /* ADDED THIS */
         case TARGET(SETUP_SANDBOX): {
-            PyObject *uid = POP();
-            PyObject *id_str = PyObject_Str(uid);
-            if (id_str == NULL) {
-                goto error;
-            }
-            const char *sid = PyUnicode_AsUTF8(id_str);
-
+            PyObject *sb_id = POP();
             if (oparg) {
-                //PyObject *sys = POP();
-                //PyObject *mem = POP();
-                PyObject *dep = PyDict_GetItemWithError(sandboxes, uid);
-                if (dep == NULL) {
-                    fprintf(stderr, "Could not find dependency for sandbox\n");
-                    exit(1);
-                }
+                PyObject *sys = POP();
+                PyObject *mem = POP();
+                fprintf(stderr, "We have [%s] %s -- %s\n", PyUnicode_AsUTF8(sb_id), 
+                    PyUnicode_AsUTF8(sys), PyUnicode_AsUTF8(mem));
+                const char* sid = PyUnicode_AsUTF8(sb_id);
                 // Let's register the sandbox.
-                SB_RegisterSandbox((char*)sid,"", ""/*(char*)PyUnicode_AsUTF8(mem),
-                    (char*)PyUnicode_AsUTF8(sys)*/);
-                SB_Prolog((char*)sid);
+                SB_RegisterSandbox((char*)sid,
+                      (char*)PyUnicode_AsUTF8(mem), 
+                      (char*)PyUnicode_AsUTF8(sys));
+                SB_Prolog(sid);
             } else {
-                SB_Epilog((char*)sid);
+                SB_Epilog((char*)PyUnicode_AsUTF8(sb_id));
             }
             DISPATCH();
         }
