@@ -3410,14 +3410,12 @@ main_loop:
             if (oparg) {
                 PyObject *sys = POP();
                 PyObject *mem = POP();
-                fprintf(stderr, "We have [%s] %s -- %s\n", PyUnicode_AsUTF8(sb_id), 
-                    PyUnicode_AsUTF8(sys), PyUnicode_AsUTF8(mem));
                 const char* sid = PyUnicode_AsUTF8(sb_id);
                 // Let's register the sandbox.
                 SB_RegisterSandbox((char*)sid,
                       (char*)PyUnicode_AsUTF8(mem), 
                       (char*)PyUnicode_AsUTF8(sys));
-                SB_Prolog(sid);
+                SB_Prolog((char*)sid);
             } else {
                 SB_Epilog((char*)PyUnicode_AsUTF8(sb_id));
             }
