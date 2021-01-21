@@ -1258,7 +1258,7 @@ static int init_types(astmodulestate *state)
         "     | If(expr test, stmt* body, stmt* orelse)\n"
         "     | With(withitem* items, stmt* body, string? type_comment)\n"
         "     | AsyncWith(withitem* items, stmt* body, string? type_comment)\n"
-        "     | Sandbox(string mem, string sys, stmt* body)\n"
+        "     | Sandbox(expr mem, expr sys, stmt* body)\n"
         "     | Raise(expr? exc, expr? cause)\n"
         "     | Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)\n"
         "     | Assert(expr test, expr? msg)\n"
@@ -1363,7 +1363,7 @@ static int init_types(astmodulestate *state)
         return 0;
     state->Sandbox_type = make_type(state, "Sandbox", state->stmt_type,
                                     Sandbox_fields, 3,
-        "Sandbox(string mem, string sys, stmt* body)");
+        "Sandbox(expr mem, expr sys, stmt* body)");
     if (!state->Sandbox_type) return 0;
     state->Raise_type = make_type(state, "Raise", state->stmt_type,
                                   Raise_fields, 2,
@@ -2357,7 +2357,7 @@ AsyncWith(asdl_seq * items, asdl_seq * body, string type_comment, int lineno,
 }
 
 stmt_ty
-Sandbox(string mem, string sys, asdl_seq * body, int lineno, int col_offset,
+Sandbox(expr_ty mem, expr_ty sys, asdl_seq * body, int lineno, int col_offset,
         int end_lineno, int end_col_offset, PyArena *arena)
 {
     stmt_ty p;
@@ -3829,12 +3829,12 @@ ast2obj_stmt(astmodulestate *state, void* _o)
         tp = (PyTypeObject *)state->Sandbox_type;
         result = PyType_GenericNew(tp, NULL, NULL);
         if (!result) goto failed;
-        value = ast2obj_string(state, o->v.Sandbox.mem);
+        value = ast2obj_expr(state, o->v.Sandbox.mem);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->mem, value) == -1)
             goto failed;
         Py_DECREF(value);
-        value = ast2obj_string(state, o->v.Sandbox.sys);
+        value = ast2obj_expr(state, o->v.Sandbox.sys);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->sys, value) == -1)
             goto failed;
@@ -6573,8 +6573,8 @@ obj2ast_stmt(astmodulestate *state, PyObject* obj, stmt_ty* out, PyArena* arena)
         return 1;
     }
     if (isinstance) {
-        string mem;
-        string sys;
+        expr_ty mem;
+        expr_ty sys;
         asdl_seq* body;
 
         if (_PyObject_LookupAttr(obj, state->mem, &tmp) < 0) {
@@ -6586,7 +6586,7 @@ obj2ast_stmt(astmodulestate *state, PyObject* obj, stmt_ty* out, PyArena* arena)
         }
         else {
             int res;
-            res = obj2ast_string(state, tmp, &mem, arena);
+            res = obj2ast_expr(state, tmp, &mem, arena);
             if (res != 0) goto failed;
             Py_CLEAR(tmp);
         }
@@ -6599,7 +6599,7 @@ obj2ast_stmt(astmodulestate *state, PyObject* obj, stmt_ty* out, PyArena* arena)
         }
         else {
             int res;
-            res = obj2ast_string(state, tmp, &sys, arena);
+            res = obj2ast_expr(state, tmp, &sys, arena);
             if (res != 0) goto failed;
             Py_CLEAR(tmp);
         }

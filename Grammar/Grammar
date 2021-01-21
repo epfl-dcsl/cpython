@@ -125,7 +125,7 @@ with_stmt: 'with' with_item (',' with_item)*  ':' [TYPE_COMMENT] suite
 with_item: test ['as' expr]
 # NB compile.c makes sure that the default except clause is last
 except_clause: 'except' [test ['as' NAME]]
-sandbox_stmt: 'sandbox' '(' STRING ',' STRING ')' ':' suite # elsa: ADDED THIS 
+sandbox_stmt: 'sandbox' '(' expr ',' expr ')' ':' suite # elsa: ADDED THIS 
 suite: simple_stmt | NEWLINE INDENT stmt+ DEDENT
 
 namedexpr_test: test [':=' test]

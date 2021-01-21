@@ -3917,7 +3917,7 @@ while_stmt_rule(Parser *p)
     return _res;
 }
 
-// sandbox_stmt: 'sandbox' '(' STRING ',' STRING ')' ':' block
+// sandbox_stmt: 'sandbox' '(' named_expression ',' named_expression ')' ':' block
 static stmt_ty
 sandbox_stmt_rule(Parser *p)
 {
@@ -3937,12 +3937,12 @@ sandbox_stmt_rule(Parser *p)
     UNUSED(_start_lineno); // Only used by EXTRA macro
     int _start_col_offset = p->tokens[_mark]->col_offset;
     UNUSED(_start_col_offset); // Only used by EXTRA macro
-    { // 'sandbox' '(' STRING ',' STRING ')' ':' block
+    { // 'sandbox' '(' named_expression ',' named_expression ')' ':' block
         if (p->error_indicator) {
             D(p->level--);
             return NULL;
         }
-        D(fprintf(stderr, "%*c> sandbox_stmt[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "'sandbox' '(' STRING ',' STRING ')' ':' block"));
+        D(fprintf(stderr, "%*c> sandbox_stmt[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "'sandbox' '(' named_expression ',' named_expression ')' ':' block"));
         Token * _keyword;
         Token * _literal;
         Token * _literal_1;
@@ -3956,11 +3956,11 @@ sandbox_stmt_rule(Parser *p)
             &&
             (_literal = _PyPegen_expect_token(p, 7))  // token='('
             &&
-            (a = _PyPegen_string_token(p))  // STRING
+            (a = named_expression_rule(p))  // named_expression
             &&
             (_literal_1 = _PyPegen_expect_token(p, 12))  // token=','
             &&
-            (b = _PyPegen_string_token(p))  // STRING
+            (b = named_expression_rule(p))  // named_expression
             &&
             (_literal_2 = _PyPegen_expect_token(p, 8))  // token=')'
             &&
@@ -3969,7 +3969,7 @@ sandbox_stmt_rule(Parser *p)
             (c = block_rule(p))  // block
         )
         {
-            D(fprintf(stderr, "%*c+ sandbox_stmt[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "'sandbox' '(' STRING ',' STRING ')' ':' block"));
+            D(fprintf(stderr, "%*c+ sandbox_stmt[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "'sandbox' '(' named_expression ',' named_expression ')' ':' block"));
             Token *_token = _PyPegen_get_last_nonnwhitespace_token(p);
             if (_token == NULL) {
                 D(p->level--);
@@ -3989,7 +3989,7 @@ sandbox_stmt_rule(Parser *p)
         }
         p->mark = _mark;
         D(fprintf(stderr, "%*c%s sandbox_stmt[%d-%d]: %s failed!\n", p->level, ' ',
-                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'sandbox' '(' STRING ',' STRING ')' ':' block"));
+                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'sandbox' '(' named_expression ',' named_expression ')' ':' block"));
     }
     _res = NULL;
   done:
