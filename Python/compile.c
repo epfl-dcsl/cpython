@@ -5054,7 +5054,7 @@ compiler_sandbox(struct compiler *c, stmt_ty s)
     ADDOP_LOAD_CONST(c, s->v.Sandbox.mem->v.Constant.value);
     ADDOP_LOAD_CONST(c, s->v.Sandbox.sys->v.Constant.value);
     ADDOP_LOAD_CONST(c, sb_id);
-   
+
     ADDOP_I(c, SETUP_SANDBOX, 1);
    
     compiler_use_next_block(c, block);
@@ -5064,10 +5064,9 @@ compiler_sandbox(struct compiler *c, stmt_ty s)
 
     // Make sure it's there
 
-  
     /* BLOCK code */
     VISIT_SEQ(c, stmt, s->v.Sandbox.body); 
-    
+
     ADDOP_LOAD_CONST(c, sb_id);
     ADDOP_I(c, SETUP_SANDBOX, 0);
     c->c_current_sb_id = NULL;
@@ -5077,16 +5076,14 @@ compiler_sandbox(struct compiler *c, stmt_ty s)
 static int // TODO how to use return value + rewrite it better
 add_sandbox_dependency(expr_ty e, struct compiler *c) 
 {
-    PyObject *dep_set;
     if (c->c_current_sb_id != NULL) {
         if (e->kind == Attribute_kind 
                 && e->v.Attribute.value->kind == Name_kind) {
             assert(PyDict_CheckExact(c->c_sb_cache));
-
             /* @aghosn added this and commented what is below. */
-            long id = PyLong_AsLong(c->c_current_sb_id);
+            PyObject* id = c->c_current_sb_id;
             char* dep = (char*) PyUnicode_AsUTF8(e->v.Attribute.value->v.Name.id);
-            SB_RegisterSandboxDependency(id, dep);
+            SB_RegisterSandboxDependency(PyUnicode_AsUTF8(id), dep);
         }
     }
     return 0;
