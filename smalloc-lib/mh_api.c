@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "mh_state.h"
 #include "mh_api.h"
 
@@ -33,6 +34,16 @@ void mh_heaps_init() {
   stack.stack = calloc(MH_STACK_INIT_SZ, sizeof(int64_t));
   stack.head = 0;
   stack.size = MH_STACK_INIT_SZ;
+
+  // Trying to increase the break of the program
+  /*if (getenv("INC_HEAP") != NULL) {
+    void* current = sbrk(0);
+    fprintf(stderr,"The current break %p\n", current); 
+    if (sbrk(2*BRK_INCREASE) == (void*)(-1)) {
+      fprintf(stderr, "Could not sbrk\n");
+    }
+    fprintf(stderr, "The new break %p\n", sbrk(0));
+  }*/
 }
 
 mh_state* mh_heaps_get_curr_heap() {

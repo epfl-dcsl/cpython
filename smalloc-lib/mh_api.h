@@ -23,7 +23,9 @@ typedef struct mh_stack_ids {
 #define MH_STACK_INIT_SZ 20
 #define MH_STACK_GROWTH_FACTOR 2
 
-#define MH_HEAPS_INIT_SZ 20
+#define BRK_INCREASE 0x2009000
+
+#define MH_HEAPS_INIT_SZ 20 
 #define MH_HEAPS_GROWTH_FACTOR 2
 
 #define MH_MAGIC (0xdeadbeef)
