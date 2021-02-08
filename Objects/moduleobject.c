@@ -91,7 +91,7 @@ PyModule_NewObject(PyObject *name)
     PyModuleObject *m;
     mh_stack_push(0);
     const char* cname = PyUnicode_AsUTF8(name);
-    int64_t id = mh_new_state(cname);
+    int64_t id = mh_new_pkg(cname);
     assert(id != mh_stack_pop());
     assert(mh_stack_pop() != id);
     mh_stack_push(id);

@@ -379,7 +379,7 @@ _Intrn_Malloc(mh_state* mhd_state, void *ctx, size_t nbytes) {
     // Tag the ptr.
     mh_header* shdr = HEADER_PTR(ptr);
     shdr->pool_id = mhd_state->pool_id;
-    shdr->mh_magic = MH_MAGIC;
+    shdr->mh_magic = MH_MAGIC_OBJ;
     return ptr;
   }
   /* We need to re-tag to let realloc know we had to reallocate inside raw.*/ 
@@ -401,7 +401,7 @@ _Extrn_Malloc(void *ctx, size_t nbytes)
     if (LIKELY(ptr != NULL)) {
         mh_header* shdr = HEADER_PTR(ptr);
         shdr->pool_id = mhd_state->pool_id; 
-        shdr->mh_magic = MH_MAGIC; 
+        shdr->mh_magic = MH_MAGIC_OBJ; 
         return HEADER_TO_USER(shdr);
     }
 
@@ -427,7 +427,7 @@ void *_Extrn_Calloc(void *ctx, size_t nelem, size_t elsize)
         memset(ptr, 0, nbytes);
         mh_header *shdr = HEADER_PTR(ptr);
         shdr->pool_id = mhd_state->pool_id;
-        shdr->mh_magic = MH_MAGIC; 
+        shdr->mh_magic = MH_MAGIC_OBJ; 
         return HEADER_TO_USER(shdr);
     }
 
@@ -701,9 +701,9 @@ _Extrn_Free(void *ctx, void *p)
     }
     int64_t id = mh_get_id(p); 
     mh_header* shdr = USER_TO_HEADER(p); 
-    assert(shdr->mh_magic == MH_MAGIC || shdr->mh_magic == MH_NOT_MAGIC); 
+    assert(MH_IS_MAGIC(shdr->mh_magic) || shdr->mh_magic == MH_NOT_MAGIC); 
     p = VOID_PTR(shdr);
-    mh_state* mhd_state = mh_heaps_get_heap(id);
+    mh_state* mhd_state = mh_heaps_get_heap(id, shdr->mh_magic);
     if (UNLIKELY(!pymalloc_free(mhd_state, ctx, p))) {
       /* pymalloc didn't allocate this address */
       PyMem_RawFree(p);
@@ -729,7 +729,7 @@ pymalloc_realloc(mh_state* mhcurr, void *ctx, void **newptr_p, void *p, size_t n
 
     assert(p != NULL);
     mh_header* shdr = HEADER_PTR(p);
-    assert(shdr->mh_magic == MH_MAGIC || shdr->mh_magic == MH_NOT_MAGIC);
+    assert(MH_IS_MAGIC(shdr->mh_magic) || shdr->mh_magic == MH_NOT_MAGIC);
     assert(shdr->pool_id == mhcurr->pool_id);
 
 #ifdef WITH_VALGRIND
@@ -798,7 +798,8 @@ _Extrn_Realloc(void *ctx, void *ptr, size_t nbytes)
     }
     // Already allocated, realloc in the same heap.
     int64_t id = mh_get_id(ptr); 
-    mh_state* mhd_state = mh_heaps_get_heap(id);
+    uint32_t magic = USER_TO_HEADER(ptr)->mh_magic;
+    mh_state* mhd_state = mh_heaps_get_heap(id, magic);
     ptr = VOID_PTR(USER_TO_HEADER(ptr));
     nbytes += HEADER_SZ;
     if (pymalloc_realloc(mhd_state, ctx, &ptr2, ptr, nbytes)) {
@@ -806,7 +807,7 @@ _Extrn_Realloc(void *ctx, void *ptr, size_t nbytes)
         shdr->pool_id = mhd_state->pool_id;
         /* It might have gotten setup. */
         if (shdr->mh_magic != MH_NOT_MAGIC) {
-          shdr->mh_magic = MH_MAGIC;
+          shdr->mh_magic = MH_MAGIC_OBJ;
         }
         return HEADER_TO_USER(shdr);
     }

@@ -10,6 +10,8 @@
 #include "pycore_tupleobject.h"
 #include "clinic/codeobject.c.h"
 
+#include "mh_api.h"
+
 /* Holder for co_extra information */
 typedef struct {
     Py_ssize_t ce_size;
@@ -225,7 +227,10 @@ PyCode_NewWithPosOnlyArgs(int argcount, int posonlyargcount, int kwonlyargcount,
     //PyInterpreterState *interp = _PyInterpreterState_Get();
     //int64_t pool_id = interp->md_ids.stack[interp->md_ids.sp-1];
     //co = PyObject_NEWFromPool(PyCodeObject, &PyCode_Type, pool_id);
+    //TODO aghosn this is where functions are getting allocated.
+    //alloc_func = 1;
     co = PyObject_New(PyCodeObject, &PyCode_Type);
+    //alloc_func = 0;
     if (co == NULL) {
         if (cell2arg)
             PyMem_FREE(cell2arg);

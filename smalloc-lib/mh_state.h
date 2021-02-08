@@ -156,6 +156,9 @@
 typedef struct mh_state {
   /* The id of this allocator */
   int64_t pool_id;
+  /* The magic handled by this mh_state */
+  uint32_t magic;
+
   poolp usedpools [2 * ((NB_SMALL_SIZE_CLASSES + 7) / 8) * 8]; 
   /* Array of objects used to track chunks of memory (arenas). */
   struct arena_object* arenas; // NULL
@@ -184,5 +187,10 @@ typedef struct mh_state {
 
   Py_ssize_t raw_allocated_blocks;
 } mh_state;
+
+typedef struct mh_pkg {
+  mh_state objects;
+  mh_state functions;
+} mh_pkg;
 
 #endif

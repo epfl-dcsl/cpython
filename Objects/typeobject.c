@@ -1047,7 +1047,7 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
     if (_PyType_IS_GC(type)) {
        if (type == &PyModule_Type) {
          // @aghosn make sure its allocations are tracked.
-         int64_t id = mh_new_state(type->tp_name);
+         int64_t id = mh_new_pkg(type->tp_name);
          mh_stack_push(id);
        } 
         obj = _PyObject_GC_Malloc(size);

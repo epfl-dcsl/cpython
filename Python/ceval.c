@@ -3411,6 +3411,11 @@ main_loop:
                 PyObject *sys = POP();
                 PyObject *mem = POP();
                 const char* sid = PyUnicode_AsUTF8(sb_id);
+                //@aghosn trying to put a single id per sandbox
+                int64_t id = mh_new_pkg(sid);
+                fprintf(stderr, "the sandbox id %ld\n", id);
+                SB_RegisterSandboxDependency(sid, sid);
+                mh_stack_push(id);
                 // Let's register the sandbox.
                 SB_RegisterSandbox((char*)sid,
                       (char*)PyUnicode_AsUTF8(mem), 
@@ -3418,6 +3423,7 @@ main_loop:
                 SB_Prolog((char*)sid);
             } else {
                 SB_Epilog((char*)PyUnicode_AsUTF8(sb_id));
+                mh_stack_pop();
             }
             DISPATCH();
         }
@@ -4967,17 +4973,21 @@ PyEval_GetGlobals(void)
  * If it cannot be found, return 0, the default id.
  */
 int64_t PyObject_Get_Current_ModuleId() {
+  MH_SAVE_ALLOC(prev)
   _Py_IDENTIFIER(__name__);
   PyThreadState *tstate = _PyThreadState_GET();
   if (tstate == NULL) {
+    MH_RESTORE_ALLOC(prev)
     return 0;
   }
   PyFrameObject *current_frame = tstate->frame;
   if (current_frame == NULL) {
-      return 0;
+    MH_RESTORE_ALLOC(prev)
+    return 0;
   }
   PyObject* globals = current_frame->f_globals;
   if (globals == NULL) {
+    MH_RESTORE_ALLOC(prev)
     return 0;
   }
   // This is the necessary because it will do an allocation.
@@ -4991,6 +5001,7 @@ int64_t PyObject_Get_Current_ModuleId() {
 
   PyObject* myMod = PyImport_GetModule(name);
   if (myMod == NULL) {
+    MH_RESTORE_ALLOC(prev)
     return 0;
   }
   if (!PyModule_Check(myMod)) {
@@ -4999,6 +5010,7 @@ int64_t PyObject_Get_Current_ModuleId() {
   }
   // we need to cast it because otherwise we are offsetted.
   PyGC_Head *g = _Py_AS_GC(myMod);
+  MH_RESTORE_ALLOC(prev)
   return mh_get_id((void*)g);
 }
 
