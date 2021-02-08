@@ -379,7 +379,7 @@ _Intrn_Malloc(mh_state* mhd_state, void *ctx, size_t nbytes) {
     // Tag the ptr.
     mh_header* shdr = HEADER_PTR(ptr);
     shdr->pool_id = mhd_state->pool_id;
-    shdr->mh_magic = MH_MAGIC_OBJ;
+    shdr->mh_magic = mhd_state->magic;//MH_MAGIC_OBJ;
     return ptr;
   }
   /* We need to re-tag to let realloc know we had to reallocate inside raw.*/ 
@@ -401,7 +401,7 @@ _Extrn_Malloc(void *ctx, size_t nbytes)
     if (LIKELY(ptr != NULL)) {
         mh_header* shdr = HEADER_PTR(ptr);
         shdr->pool_id = mhd_state->pool_id; 
-        shdr->mh_magic = MH_MAGIC_OBJ; 
+        shdr->mh_magic = mhd_state->magic;//MH_MAGIC_OBJ; 
         return HEADER_TO_USER(shdr);
     }
 
@@ -427,7 +427,7 @@ void *_Extrn_Calloc(void *ctx, size_t nelem, size_t elsize)
         memset(ptr, 0, nbytes);
         mh_header *shdr = HEADER_PTR(ptr);
         shdr->pool_id = mhd_state->pool_id;
-        shdr->mh_magic = MH_MAGIC_OBJ; 
+        shdr->mh_magic = mhd_state->magic;//MH_MAGIC_OBJ; 
         return HEADER_TO_USER(shdr);
     }
 
@@ -807,7 +807,7 @@ _Extrn_Realloc(void *ctx, void *ptr, size_t nbytes)
         shdr->pool_id = mhd_state->pool_id;
         /* It might have gotten setup. */
         if (shdr->mh_magic != MH_NOT_MAGIC) {
-          shdr->mh_magic = MH_MAGIC_OBJ;
+          shdr->mh_magic = mhd_state->magic;//MH_MAGIC_OBJ;
         }
         return HEADER_TO_USER(shdr);
     }
