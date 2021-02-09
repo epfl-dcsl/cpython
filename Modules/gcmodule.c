@@ -33,6 +33,9 @@
 #include "pydtrace.h"
 #include "pytime.h"             // _PyTime_GetMonotonicClock()
 
+#include "mh_api.h"
+#include "liblitterbox.h"
+
 typedef struct _gc_runtime_state GCState;
 
 /*[clinic input]
@@ -1180,6 +1183,10 @@ collect(PyThreadState *tstate, int generation,
     PyGC_Head *gc;
     _PyTime_t t1 = 0;   /* initialize to prevent a compiler warning */
     GCState *gcstate = &tstate->interp->gc;
+    if (SB_inside) {
+      SB_switch_rt();
+      mh_marker = 333;
+    }
 
     if (gcstate->debug & DEBUG_STATS) {
         PySys_WriteStderr("gc: collecting generation %d...\n", generation);
@@ -1327,6 +1334,9 @@ collect(PyThreadState *tstate, int generation,
     }
 
     assert(!_PyErr_Occurred(tstate));
+    if (SB_inside) {
+      SB_switch_in();
+    }
     return n + m;
 }
 

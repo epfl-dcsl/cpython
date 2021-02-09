@@ -152,3 +152,5 @@ static void mh_grow_mh_heaps() {
       MH_HEAPS_GROWTH_FACTOR * all_heaps->curr_size, sizeof(mh_pkg*)); 
   all_heaps->curr_size *= MH_HEAPS_GROWTH_FACTOR;
 }
+
+/* Helper function to know if we should skip or not */

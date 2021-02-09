@@ -114,12 +114,10 @@ PyCMethod_New(PyMethodDef *ml, PyObject *self, PyObject *module, PyTypeObject *c
     op->m_module = module;
     op->vectorcall = vectorcall;
     if (SB_inside) {
-      mh_marker += (1<< 8);
       SB_switch_rt();
     }
     _PyObject_GC_TRACK(op);
     if (SB_inside) {
-      mh_marker += 1;
       SB_switch_in();
     }
     return (PyObject *)op;
