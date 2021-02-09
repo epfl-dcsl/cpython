@@ -15,6 +15,7 @@ int alloc_func = 0;
 /* Hooks for LitterBox. */
 void (*register_id)(const char*, int) = NULL;
 void (*register_growth)(int, void*, size_t) = NULL;
+void (*register_mh_refcount)(int, void*, int, int) = NULL;
 
 /* Local globals (lol). */
 static void mh_grow_mh_heaps();
@@ -149,4 +150,21 @@ static void mh_grow_mh_heaps() {
   all_heaps->heaps = reallocarray(all_heaps->heaps,
       MH_HEAPS_GROWTH_FACTOR * all_heaps->curr_size, sizeof(mh_pkg*)); 
   all_heaps->curr_size *= MH_HEAPS_GROWTH_FACTOR;
+}
+
+void mh_refcounter(void* ptr, int cur, int incr) {
+  if (ptr == NULL) {
+    return;
+  }
+  mh_header* shdr = USER_TO_HEADER(ptr);
+  if (!MH_IS_MAGIC(shdr->mh_magic) && shdr->mh_magic != MH_NOT_MAGIC) {
+    return;
+  }
+  if (shdr->mh_magic == MH_NOT_MAGIC) {
+    return;
+  }
+  int id = shdr->pool_id;
+  if (register_mh_refcount != NULL) {
+    register_mh_refcount(id, ptr, cur, incr);
+  }
 }

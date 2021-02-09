@@ -398,6 +398,9 @@ PyAPI_FUNC(void) _Py_NegativeRefcount(const char *filename, int lineno,
                                       PyObject *op);
 #endif /* Py_REF_DEBUG */
 
+extern int SB_inside;
+extern void (*register_ref)(void* ptr, int curr, int incr);
+
 PyAPI_FUNC(void) _Py_Dealloc(PyObject *);
 
 static inline void _Py_INCREF(PyObject *op)
@@ -405,6 +408,9 @@ static inline void _Py_INCREF(PyObject *op)
 #ifdef Py_REF_DEBUG
     _Py_RefTotal++;
 #endif
+    if (SB_inside) {
+      register_ref((void*)op, op->ob_refcnt, 1);
+    }
     op->ob_refcnt++;
 }
 
@@ -423,6 +429,9 @@ static inline void _Py_DECREF(
 #ifdef Py_REF_DEBUG
         if (op->ob_refcnt < 0) {
             _Py_NegativeRefcount(filename, lineno, op);
+        }
+        if (SB_inside) {
+          register_ref((void*)op, op->ob_refcnt, 0);
         }
 #endif
     }

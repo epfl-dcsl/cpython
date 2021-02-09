@@ -71,7 +71,9 @@ int64_t mh_get_id(void* ptr);
 int64_t mh_new_pkg(const char* name);
 
 /* Hooks for LitterBox callbacks. */
+void mh_refcounter(void* ptr, int cur, int incr); 
 extern void (*register_id)(const char*, int);
 extern void (*register_growth)(int, void*, size_t);
+extern void (*register_mh_refcount)(int, void*, int, int);
 
 #endif

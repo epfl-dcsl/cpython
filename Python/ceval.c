@@ -127,6 +127,7 @@ static size_t opcache_global_hits = 0;
 static size_t opcache_global_misses = 0;
 #endif
 
+int SB_inside = 0; 
 
 #ifndef NDEBUG
 /* Ensure that tstate is valid: sanity check for PyEval_AcquireThread() and
@@ -3421,8 +3422,11 @@ main_loop:
                       (char*)PyUnicode_AsUTF8(mem), 
                       (char*)PyUnicode_AsUTF8(sys));
                 SB_Prolog((char*)sid);
+                SB_inside = 1;
             } else {
                 SB_Epilog((char*)PyUnicode_AsUTF8(sb_id));
+                SB_inside = 0;
+                SB_showref();
                 mh_stack_pop();
             }
             DISPATCH();

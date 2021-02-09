@@ -20,6 +20,8 @@ extern "C" {
 /* Defined in tracemalloc.c */
 extern void _PyMem_DumpTraceback(int fd, const void *ptr);
 
+void (*register_ref)(void* ptr, int curr, int incr) = NULL;
+
 _Py_IDENTIFIER(Py_Repr);
 _Py_IDENTIFIER(__bytes__);
 _Py_IDENTIFIER(__dir__);
