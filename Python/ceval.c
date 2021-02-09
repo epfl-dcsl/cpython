@@ -49,15 +49,27 @@
 
 _Py_IDENTIFIER(__name__);
 
-#define My_Py_INCREF(obj) \
-  if (SB_inside == 0) { \
+#define My_Py_INCREF(obj) {\
+  if (SB_inside == 0 || check_readonly == NULL || mh_danger(obj) == 0) { \
     Py_INCREF(obj); \
-  }
+  } else { \
+    SB_switch_rt(); \
+    Py_INCREF(obj); \
+    SB_switch_in(); \
+  } \
+}
 
-#define My_Py_DECREF(obj) \
-  if (SB_inside == 0) { \
+// Calling mh_danger here triggers a fault apparently?
+#define My_Py_DECREF(obj) {\
+  if (SB_inside == 0 || check_readonly == NULL /*|| mh_danger(obj) == 0*/) { \
     Py_DECREF(obj); \
-  }
+  } else { \
+    SB_switch_rt(); \
+    Py_DECREF(obj); \
+    SB_switch_in(); \
+  } \
+}
+
 
 /* Forward declarations */
 Py_LOCAL_INLINE(PyObject *) call_function(
@@ -2575,9 +2587,7 @@ main_loop:
                         PyObject *ptr = lg->ptr;
                         OPCACHE_STAT_GLOBAL_HIT();
                         assert(ptr != NULL);
-                        if (SB_inside == 0) {
-                          My_Py_INCREF(ptr);
-                        }
+                        My_Py_INCREF(ptr);
                         PUSH(ptr);
                         DISPATCH();
                     }

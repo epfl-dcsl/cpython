@@ -442,7 +442,9 @@ static int
 visit_decref(PyObject *op, void *parent)
 {
     _PyObject_ASSERT(_PyObject_CAST(parent), !_PyObject_IsFreed(op));
-
+    if (SB_inside) {
+      SB_switch_rt();
+    }
     if (_PyObject_IS_GC(op)) {
         PyGC_Head *gc = AS_GC(op);
         /* We're only interested in gc_refs for objects in the
@@ -452,6 +454,9 @@ visit_decref(PyObject *op, void *parent)
         if (gc_is_collecting(gc)) {
             gc_decref(gc);
         }
+    }
+    if (SB_inside) {
+      SB_switch_in();
     }
     return 0;
 }
@@ -1185,7 +1190,6 @@ collect(PyThreadState *tstate, int generation,
     GCState *gcstate = &tstate->interp->gc;
     if (SB_inside) {
       SB_switch_rt();
-      mh_marker = 333;
     }
 
     if (gcstate->debug & DEBUG_STATS) {

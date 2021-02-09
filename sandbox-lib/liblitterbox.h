@@ -95,6 +95,8 @@ extern void SB_refcount(void* p0, int p1, int p2);
 
 extern void SB_checkref(int p0, void* p1, int p2, int p3);
 
+extern int SB_isRO(int p0);
+
 extern void SB_showref();
 
 #ifdef __cplusplus

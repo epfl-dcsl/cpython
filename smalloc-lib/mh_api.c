@@ -17,6 +17,7 @@ int mh_marker = 0;
 /* Hooks for LitterBox. */
 void (*register_id)(const char*, int) = NULL;
 void (*register_growth)(int, void*, size_t) = NULL;
+int (*check_readonly)(int) = NULL;
 
 /* Local globals (lol). */
 static void mh_grow_mh_heaps();
@@ -154,3 +155,19 @@ static void mh_grow_mh_heaps() {
 }
 
 /* Helper function to know if we should skip or not */
+int mh_danger(void* ptr) {
+  if (ptr == NULL) {
+    return 0;
+  }
+  mh_header* shdr = USER_TO_HEADER(ptr);
+  // Allocated in common grounds
+  if (shdr->mh_magic == MH_NOT_MAGIC) {
+    return 0;
+  }
+  // Be conservative, we might have a problem.
+  if (MH_IS_MAGIC(shdr->mh_magic) == 0 ) {
+    return 1;
+  }
+  // We have a header and a pool_id, so let's check if it's readonly. 
+  return check_readonly(shdr->pool_id);
+}

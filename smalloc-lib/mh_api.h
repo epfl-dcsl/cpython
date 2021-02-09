@@ -70,11 +70,16 @@ int64_t mh_stack_pop();
 /* Getting the id from a pointer. */
 int64_t mh_get_id(void* ptr);
 
+/* Checking if there is a danger. */
+int mh_danger(void* ptr);
+
 /* mh_pkg functions */
 int64_t mh_new_pkg(const char* name);
+
 
 /* Hooks for LitterBox callbacks. */
 extern void (*register_id)(const char*, int);
 extern void (*register_growth)(int, void*, size_t);
+extern int (*check_readonly)(int);
 
 #endif

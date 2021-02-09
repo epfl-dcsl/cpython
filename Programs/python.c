@@ -21,6 +21,7 @@ main(int argc, char **argv)
     SB_Initialize();
     register_id = &SB_RegisterPackageId; 
     register_growth = &SB_AddSection;
+    check_readonly = &SB_isRO;
     mh_heaps_init(); 
     ret = Py_BytesMain(argc, argv);
     return ret;
