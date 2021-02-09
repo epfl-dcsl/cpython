@@ -54,6 +54,9 @@ typedef struct mh_stack_ids {
 
 extern mh_heaps* all_heaps;
 extern int alloc_func;
+extern int SB_inside;
+
+extern int mh_marker;
 
 void mh_heaps_init();
 mh_state* mh_heaps_get_curr_heap();

@@ -11,6 +11,8 @@
 /* This function will allow us to get the current module id or 0, the default.*/
 extern int64_t PyObject_Get_Current_ModuleId(void); 
 int alloc_func = 0;
+int SB_inside = 0;
+int mh_marker = 0;
 
 /* Hooks for LitterBox. */
 void (*register_id)(const char*, int) = NULL;
