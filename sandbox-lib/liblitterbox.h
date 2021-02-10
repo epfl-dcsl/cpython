@@ -79,7 +79,9 @@ extern void SB_RegisterDependency(char* p0, char* p1);
 
 extern void SB_RegisterPackageId(char* p0, int p1);
 
-extern void SB_RegisterSandbox(char* p0, char* p1, char* p2);
+extern void SB_RegisterSandbox(int p0, char* p1, char* p2, char* p3);
+
+extern int SB_GetSandboxPid(char* p0);
 
 extern void SB_RegisterSandboxDependency(char* p0, char* p1);
 

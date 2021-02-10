@@ -3434,14 +3434,17 @@ main_loop:
                 PyObject *mem = POP();
                 const char* sid = PyUnicode_AsUTF8(sb_id);
                 //@aghosn trying to put a single id per sandbox
-                int64_t id = mh_new_pkg(sid);
-                fprintf(stderr, "the sandbox id %ld\n", id);
-                SB_RegisterSandboxDependency(sid, sid);
-                mh_stack_push(id);
-                // Let's register the sandbox.
-                SB_RegisterSandbox((char*)sid,
+                int64_t id = SB_GetSandboxPid(sid);
+                if (id == -1) {
+                  id = mh_new_pkg(sid);
+                  //fprintf(stderr, "the sandbox id %ld\n", id);
+                	SB_RegisterSandboxDependency(sid, sid);
+                	// Let's register the sandbox.
+                	SB_RegisterSandbox(id, (char*)sid,
                       (char*)PyUnicode_AsUTF8(mem), 
                       (char*)PyUnicode_AsUTF8(sys));
+                }
+                mh_stack_push(id);
                 SB_Prolog((char*)sid);
                 SB_inside = 1;
             } else {
