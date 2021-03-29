@@ -61,7 +61,7 @@ _Py_IDENTIFIER(__name__);
 
 // Calling mh_danger here triggers a fault apparently?
 #define My_Py_DECREF(obj) {\
-  if (SB_inside == 0 || check_readonly == NULL /*|| mh_danger(obj) == 0*/) { \
+  if (1 || SB_inside == 0 || check_readonly == NULL /*|| mh_danger(obj) == 0*/) { \
     Py_DECREF(obj); \
   } else { \
     SB_switch_rt(); \

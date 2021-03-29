@@ -442,9 +442,9 @@ static int
 visit_decref(PyObject *op, void *parent)
 {
     _PyObject_ASSERT(_PyObject_CAST(parent), !_PyObject_IsFreed(op));
-    if (SB_inside) {
-      SB_switch_rt();
-    }
+    /*if (SB_inside) {
+      SB_switch_rt(2);
+    }*/
     if (_PyObject_IS_GC(op)) {
         PyGC_Head *gc = AS_GC(op);
         /* We're only interested in gc_refs for objects in the
@@ -455,9 +455,9 @@ visit_decref(PyObject *op, void *parent)
             gc_decref(gc);
         }
     }
-    if (SB_inside) {
-      SB_switch_in();
-    }
+    /*if (SB_inside) {
+      SB_switch_in(2);
+    }*/
     return 0;
 }
 

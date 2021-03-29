@@ -164,10 +164,13 @@ int mh_danger(void* ptr) {
   if (shdr->mh_magic == MH_NOT_MAGIC) {
     return 0;
   }
+  // TODO(aghosn) This is a slow down
   // Be conservative, we might have a problem.
   if (MH_IS_MAGIC(shdr->mh_magic) == 0 ) {
     return 1;
   }
+  return 1;
+  //TODO(aghosn) this is slow as well
   // We have a header and a pool_id, so let's check if it's readonly. 
   return check_readonly(shdr->pool_id);
 }

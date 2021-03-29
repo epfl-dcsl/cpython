@@ -113,13 +113,13 @@ PyCMethod_New(PyMethodDef *ml, PyObject *self, PyObject *module, PyTypeObject *c
     Py_XINCREF(module);
     op->m_module = module;
     op->vectorcall = vectorcall;
-    if (SB_inside) {
-      SB_switch_rt();
-    }
+    /*if (SB_inside) {
+      SB_switch_rt(1);
+    }*/
     _PyObject_GC_TRACK(op);
-    if (SB_inside) {
-      SB_switch_in();
-    }
+    /*if (SB_inside) {
+      SB_switch_in(1);
+    }*/
     return (PyObject *)op;
 }
 
@@ -168,13 +168,13 @@ PyCMethod_GetClass(PyObject *op)
 static void
 meth_dealloc(PyCFunctionObject *m)
 {
-    if (SB_inside) {
-      SB_switch_rt();
-    }
+    /*if (SB_inside) {
+      SB_switch_rt(1);
+    }*/
     _PyObject_GC_UNTRACK(m);
-    if (SB_inside) {
-      SB_switch_in();
-    }
+    /*if (SB_inside) {
+      SB_switch_in(1);
+    }*/
     if (m->m_weakreflist != NULL) {
         PyObject_ClearWeakRefs((PyObject*) m);
     }
